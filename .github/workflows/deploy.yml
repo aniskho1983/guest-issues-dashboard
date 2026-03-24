@@ -1,0 +1,39 @@
+name: Generate & Deploy Dashboard
+
+on:
+  # Auto-refresh every Monday at 8:00 AM Central Time (14:00 UTC)
+  schedule:
+    - cron: '0 14 * * 1'
+
+  # Manual trigger — click "Run workflow" in GitHub Actions tab anytime
+  workflow_dispatch:
+
+  # Also deploy whenever you push changes to the repo
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate static dashboard
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        run: python3 generate.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          commit_message: "Dashboard refresh — ${{ github.event_name }}"
