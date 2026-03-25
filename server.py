@@ -253,7 +253,7 @@ def compute_dashboard(raw_records):
 
     # Compact format for client-side computation — keeps payload small
     compact = [
-        {"date": r["date"], "cats": r["issueCategories"], "dept": r["department"], "room": r["room"]}
+        {"date": r["date"], "cats": r["issueCategories"], "dept": r["department"], "room": r["room"], "title": r["issueTitle"]}
         for r in records
     ]
 
