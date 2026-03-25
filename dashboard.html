@@ -159,10 +159,18 @@
     .empty { text-align: center; padding: 36px; font-size: 13px; color: var(--text-3); font-style: italic; }
 
     /* ── Urgent Issues ── */
+    .urgent-section { margin-bottom: 22px; }
+    .urgent-section:last-child { margin-bottom: 0; }
+    .urgent-section-hdr {
+      font-size: 10px; font-weight: 700; letter-spacing: .13em;
+      text-transform: uppercase; color: var(--sc, var(--gold));
+      padding: 0 2px 8px; border-bottom: 2px solid var(--sc, var(--gold));
+      margin-bottom: 4px;
+    }
     .tbl { display: flex; flex-direction: column; }
     .tbl-head {
       display: grid;
-      grid-template-columns: 42px 1fr 100px 90px 1fr 20px;
+      grid-template-columns: var(--tbl-cols, 36px 1fr 90px 80px 32px);
       gap: 12px; padding: 6px 10px 10px;
       font-size: 10px; font-weight: 600;
       letter-spacing: .14em; text-transform: uppercase;
@@ -170,7 +178,7 @@
     }
     .tbl-row {
       display: grid;
-      grid-template-columns: 42px 1fr 100px 90px 1fr 20px;
+      grid-template-columns: var(--tbl-cols, 36px 1fr 90px 80px 32px);
       gap: 12px; align-items: center;
       padding: 13px 10px;
       border-bottom: 1px solid var(--border);
@@ -476,21 +484,77 @@ var FNB_DEPTS = new Set([
   "F&B - Peacock Lounge","F&B - Quill","F&B - Goldie's","F&B - Kappo Kappo"
 ]);
 
-// Categories that represent positive feedback or non-actionable entries —
-// excluded from urgent issues scoring and all drill-down breakdowns.
-var NON_ACTIONABLE_CATS = new Set([
-  "Guest Service","Guest Service Highlight","Guest Service Highlights","Guest Service Excellence",
-  "Guest Experience",
+// ── Category taxonomy ─────────────────────────────────────────────────────
+// Explicit positive blocklist — these are never shown as actionable issues.
+// Do NOT add categories that represent real failures (e.g. "Guest Service Failures").
+var POSITIVE_CATS = new Set([
+  "Guest Service","Guest Service Highlight","Guest Service Highlights",
+  "Guest Service Excellence","Guest Experience",
   "Valet Service Excellence","Valet Service Positive",
   "Staff Compliment","Staff Service",
-  "Positive Recognition","Dining Experience"
+  "Positive Recognition","Dining Experience",
+  "Food & Beverage Positive","F&B Positive","Pool Experience Positive",
+  "Spa Experience Positive","Fitness Positive",
 ]);
+
 function isNonActionable(cat) {
-  if (NON_ACTIONABLE_CATS.has(cat)) return true;
+  if (POSITIVE_CATS.has(cat)) return true;
   const t = cat.toLowerCase();
-  return t.includes('positive') || t.includes('excellence') ||
-         t.includes('highlight') || t.includes('compliment') ||
-         t.includes('promoter') || t.includes('recognition');
+  // Keyword patterns that reliably signal praise/recognition
+  if (t.includes('excellence') || t.includes('highlight') ||
+      t.includes('compliment') || t.includes('recognition') ||
+      t.includes('promoter')) return true;
+  // "positive" only when not part of a negative phrase
+  if (t.includes('positive') && !t.includes('false positive')) return true;
+  // Bare "Guest Service" without a failure/issue qualifier
+  if (t.startsWith('guest service') &&
+      !t.includes('fail') && !t.includes('communication') && !t.includes('issue')) return true;
+  return false;
+}
+
+// Merge synonym/alias categories into a single canonical name.
+// This prevents the same issue type appearing as two separate rows.
+var CAT_NORMALIZE = {
+  'HVAC/Temperature':              'HVAC & Hot Water',
+  'Hot Water/HVAC':                'HVAC & Hot Water',
+  'In-Room Tech Issues':           'In-Room Technology',
+  'Technology/TV':                 'In-Room Technology',
+  'Technology/Phone System Issues':'Phone System Issues',
+  'Room Comfort and Decor':        'Room Comfort',
+  'Pool Too Small':                'Pool Size & Capacity',
+  'Pool Size':                     'Pool Size & Capacity',
+  'Pool Chair Availability':       'Pool Size & Capacity',
+};
+
+// Reverse map: canonical → all original aliases (used when filtering records in drillUrgent)
+var CAT_ALIASES_OF = {};
+for (var _a in CAT_NORMALIZE) {
+  var _c = CAT_NORMALIZE[_a];
+  if (!CAT_ALIASES_OF[_c]) CAT_ALIASES_OF[_c] = [];
+  CAT_ALIASES_OF[_c].push(_a);
+}
+
+function normalizeCat(cat) { return CAT_NORMALIZE[cat] || cat; }
+
+// Classify a canonical category into service | facility | fnb | positive
+function catType(cat) {
+  if (isNonActionable(cat)) return 'positive';
+  // Facility: physical room/building infrastructure
+  // (based on FACILITY_CATS set + public space categories)
+  if (FACILITY_CATS.has(cat) || PUBLIC_SPACE_MAP.hasOwnProperty(cat)) return 'facility';
+  // Merged facility canonicals
+  if (cat === 'HVAC & Hot Water' || cat === 'Pool Size & Capacity') return 'facility';
+  // F&B: food, beverage, dining venues
+  const t = cat.toLowerCase();
+  if (t.includes('ird') || t.includes('in-room dining') ||
+      t.includes('peacock') || t.includes('piscina') || t.includes('quill') ||
+      t.includes('goldie') || t.includes('kappo') || t.includes('lounge service') ||
+      t.includes('food quality') || t.includes('food temp') || t.includes('food presentation') ||
+      t.includes('f&b') || t.includes('food & bev') ||
+      t.includes('beverage') || t.includes('menu') ||
+      (t.includes('dining') && !t.includes('dining experience')) ||
+      t.includes('restaurant service')) return 'fnb';
+  return 'service';
 }
 
 // ── Issue sub-classifiers (keyword → sub-category, built from real Notion data) ──
@@ -518,11 +582,13 @@ var ISSUE_CLASSIFIERS = {
     { sub: 'Incomplete / Missed Service',       keys: ['not serviced','room not serviced','not cleaned properly','service requested','missed','failed to'] },
   ],
 
-  'Hot Water/HVAC': [
-    { sub: 'No Hot Water',                      keys: ['no hot water','hot water issue','hot water in','lack of hot','not getting hot'] },
-    { sub: 'Temperature Too Cold / Warm',       keys: ['too cold','too warm','too hot','heat not working','room too cold','room too warm','couldn\'t get warm','target temperature','not reaching temp'] },
-    { sub: 'Shower Pressure / Function',        keys: ['shower pressure','water pressure','low pressure','shower not function','shower too hot','shower only warm','lukewarm shower','shower temperature'] },
-    { sub: 'HVAC / A/C Not Working',            keys: ['hvac','a/c not','ac not','thermostat','air condition','ac unit','not cooling','not heating'] },
+  'HVAC & Hot Water': [
+    { sub: 'No Hot Water',                      keys: ['no hot water','hot water','lack of hot','not getting hot','cold water only','only cold water'] },
+    { sub: 'Room Too Cold',                     keys: ['too cold','freezing','room cold','couldn\'t get warm','heat not','not heating','couldn\'t sleep cold','cold air blowing'] },
+    { sub: 'Room Too Warm / Won\'t Cool',       keys: ['too warm','too hot','not cooling','a/c not','ac not','no cool','no a/c','overheating','sweating','air condition not'] },
+    { sub: 'Thermostat / Controls',             keys: ['thermostat','target temperature','settings','not responding','control','couldn\'t control','override'] },
+    { sub: 'HVAC Noise',                        keys: ['hvac noise','loud hvac','rattling','banging','vent noise','fan noise','blowing noise','noisy unit'] },
+    { sub: 'Shower Water Issues',               keys: ['shower pressure','low pressure','water pressure','lukewarm shower','shower temperature','shower too hot','shower only warm'] },
   ],
 
   'Engineering Service': [
@@ -569,12 +635,6 @@ var ISSUE_CLASSIFIERS = {
     { sub: 'Humidity / Air Quality',            keys: ['humid','humidity','stuffy','stuffy air','dry air','ventilation','airflow','damp'] },
   ],
 
-  'HVAC/Temperature': [
-    { sub: 'Room Too Cold',                     keys: ['too cold','cold room','freezing','couldn\'t get warm','hvac blowing cold','cold air','not heating','heat not'] },
-    { sub: 'Room Too Warm / Hot',               keys: ['too warm','too hot','overheating','not cooling','no cool','sweating','a/c not work','ac not work','no a/c'] },
-    { sub: 'Thermostat Not Responding',         keys: ['thermostat','settings','target temp','couldn\'t control','not responding','override','reset'] },
-    { sub: 'HVAC Noise',                        keys: ['hvac noise','loud hvac','banging','rattling','fan noise','vent noise','blowing noise'] },
-  ],
 
   'Noise Issues': [
     { sub: 'Hallway / Neighboring Guests',      keys: ['hallway','neighbor','next door','corridor','door slam','voices','talking','party','thin wall','hear people','room next','adjacent'] },
@@ -608,20 +668,14 @@ var ISSUE_CLASSIFIERS = {
     { sub: 'Controls Not Working',              keys: ['switch','control','panel','automated','timer','doesn\'t respond','bedside','won\'t turn off','won\'t turn on'] },
   ],
 
-  'Technology/TV': [
-    { sub: 'TV Not Working / No Signal',        keys: ['tv not','no signal','black screen','frozen','no picture','channels','cable not','tv off','wont turn on'] },
-    { sub: 'Streaming / Casting',               keys: ['netflix','streaming','cast','airplay','chromecast','app','connect to tv','sign in','login','hulu','apple tv'] },
-    { sub: 'Remote / Controls',                 keys: ['remote','control','no remote','dead batteries','doesn\'t respond','remote not'] },
-    { sub: 'WiFi / Internet',                   keys: ['wifi','wi-fi','internet','slow connection','no connection','can\'t connect','dropped','bandwidth','network'] },
-    { sub: 'Phone / In-Room System',            keys: ['phone','in-room phone','not working phone','phone system','dial','call','voicemail'] },
-  ],
 
   'In-Room Technology': [
-    { sub: 'TV / Entertainment',                keys: ['tv','television','screen','channels','streaming','netflix','remote','casting'] },
-    { sub: 'WiFi / Internet',                   keys: ['wifi','wi-fi','internet','connection','network','slow','can\'t connect'] },
-    { sub: 'Phone System',                      keys: ['phone','in-room phone','calling','dial','voicemail','phone not'] },
-    { sub: 'Bluetooth / Speakers',              keys: ['bluetooth','speaker','music','audio','pair','connect device'] },
-    { sub: 'USB / Charging',                    keys: ['usb','charging','outlet','charger','plug','charge phone','power'] },
+    { sub: 'TV Not Working / No Signal',        keys: ['tv not','no signal','black screen','frozen','no picture','channels','cable not','wont turn on','tv off','blank screen'] },
+    { sub: 'Streaming / Casting',               keys: ['netflix','streaming','cast','airplay','chromecast','app','connect to tv','sign in','login','hulu','apple tv','disney'] },
+    { sub: 'Remote / Controls',                 keys: ['remote','no remote','dead batteries','doesn\'t respond','remote not working','remote missing'] },
+    { sub: 'WiFi / Internet',                   keys: ['wifi','wi-fi','internet','slow connection','no connection','can\'t connect','dropped','bandwidth','network','connectivity'] },
+    { sub: 'Phone / In-Room System',            keys: ['phone','in-room phone','not working phone','phone system','dial','call','voicemail','no dial tone'] },
+    { sub: 'Bluetooth / Charging',              keys: ['bluetooth','speaker','usb','charging','outlet','charger','pair','power outlet'] },
   ],
 
   'Shower Issues': [
@@ -787,28 +841,38 @@ function computeSections(records, startDate, endDate) {
   const now = new Date();
   const periodDays = (endDate - startDate) / 86400000 || 1;
 
-  // ── Urgent Issues (top 10, min 3 occurrences, actionable only) ──
-  const catMap = {};
+  // ── Urgent Issues — split into service / facility / fnb ──
+  // Categories are normalized to merge synonyms (e.g. Hot Water/HVAC + HVAC/Temperature → HVAC & Hot Water)
+  const svcMap = {}, facMap = {}, fnbMap = {};
   for (const r of filtered) {
-    for (const cat of (r.cats || [])) {
-      if (isNonActionable(cat)) continue;
-      if (!catMap[cat]) catMap[cat] = { count: 0, lastDate: null, depts: {} };
-      catMap[cat].count++;
-      if (!catMap[cat].lastDate || r.date > catMap[cat].lastDate) catMap[cat].lastDate = r.date;
-      if (r.dept) catMap[cat].depts[r.dept] = true;
+    for (const rawCat of (r.cats || [])) {
+      const cat = normalizeCat(rawCat);
+      const type = catType(cat);
+      if (type === 'positive') continue;
+      const map = type === 'facility' ? facMap : type === 'fnb' ? fnbMap : svcMap;
+      if (!map[cat]) map[cat] = { count: 0, lastDate: null };
+      map[cat].count++;
+      if (!map[cat].lastDate || r.date > map[cat].lastDate) map[cat].lastDate = r.date;
     }
   }
-  const maxCount = Math.max(1, ...Object.values(catMap).map(v => v.count));
-  const urgentIssues = Object.entries(catMap)
-    .filter(([cat, v]) => v.count >= 3 && !isNonActionable(cat))
-    .map(([cat, v]) => {
-      const daysAgo = (now - new Date(v.lastDate + (v.lastDate.length === 10 ? 'T00:00:00Z' : ''))) / 86400000;
-      const recency = Math.max(0, 1 - daysAgo / periodDays);
-      const score = 0.6 * (v.count / maxCount) + 0.4 * recency;
-      return { category: cat, count: v.count, lastOccurrence: v.lastDate, departments: Object.keys(v.depts), score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
+
+  function rankCats(map, minOccurrences, limit) {
+    const maxCount = Math.max(1, ...Object.values(map).map(v => v.count));
+    return Object.entries(map)
+      .filter(([, v]) => v.count >= minOccurrences)
+      .map(([cat, v]) => {
+        const daysAgo = (now - new Date(v.lastDate + (v.lastDate.length === 10 ? 'T00:00:00Z' : ''))) / 86400000;
+        const recency = Math.max(0, 1 - daysAgo / periodDays);
+        const score = 0.6 * (v.count / maxCount) + 0.4 * recency;
+        return { category: cat, count: v.count, lastOccurrence: v.lastDate, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  const serviceIssues  = rankCats(svcMap, 2, 8);
+  const facilityIssues = rankCats(facMap, 2, 8);
+  const fnbIssues      = rankCats(fnbMap, 2, 8);
 
   // ── Room Patterns (facility only, 2+ occurrences) ──
   const roomMap = {};
@@ -854,7 +918,7 @@ function computeSections(records, startDate, endDate) {
 
   const venuePatterns = deptPatterns.filter(d => FNB_DEPTS.has(d.dept));
 
-  return { urgentIssues, roomPatterns, publicSpacePatterns, deptPatterns, venuePatterns };
+  return { serviceIssues, facilityIssues, fnbIssues, roomPatterns, publicSpacePatterns, deptPatterns, venuePatterns };
 }
 
 function computeYTD(records) {
@@ -901,49 +965,50 @@ function card(title, sub, ts, body) {
     </div>`;
 }
 
-function buildUrgent(issues, ts, pl) {
+function buildUrgent(svcIssues, facIssues, fnbIssues, ts, pl) {
   pl = pl || 'Last 30 Days';
-  if (!issues || !issues.length) {
-    return card(
-      `Top Urgent Issues \u2014 ${pl}`,
-      'Ranked by pattern frequency + recency \u00b7 Minimum 3 occurrences to qualify',
-      ts,
-      '<div class="empty">No issue patterns meet the urgency threshold yet.</div>'
-    );
-  }
 
   const rankClass = i => i === 0 ? 'rank rank-gold' : i <= 2 ? 'rank rank-silver' : 'rank';
 
-  const rows = issues.map((issue, i) => {
-    const uid = urgentSafeId(issue.category);
-    const esc = issue.category.replace(/'/g, "\\'");
-    const depts = issue.departments.slice(0,3).map(d => `<span class="tag">${d}</span>`).join('');
-    const more = issue.departments.length > 3 ? `<span class="tag tag-dim">+${issue.departments.length - 3}</span>` : '';
+  function issueRows(issues) {
+    if (!issues.length) return '<div class="empty" style="padding:10px 0">No recurring patterns in this period.</div>';
+    return issues.map((issue, i) => {
+      const uid = urgentSafeId(issue.category);
+      const esc = issue.category.replace(/'/g, "\\'");
+      return `
+      <div class="tbl-row" onclick="drillUrgent('${esc}', this)">
+        <span class="${rankClass(i)}">${i + 1}</span>
+        <span class="issue-name">${issue.category}</span>
+        <span><span class="pill">${issue.count}</span></span>
+        <span class="issue-date">${daysAgoLabel(issue.lastOccurrence)}</span>
+        <span class="bar-arrow">&#9660;</span>
+      </div>
+      <div class="urgent-drill" id="${uid}" style="display:none"></div>`;
+    }).join('');
+  }
+
+  const tblHead = `<div class="tbl-head" style="grid-template-columns:36px 1fr 90px 80px 32px">
+    <span>#</span><span>Issue</span><span>Occurrences</span><span>Last Seen</span><span></span>
+  </div>`;
+
+  function section(label, issues, color) {
     return `
-    <div class="tbl-row" onclick="drillUrgent('${esc}', this)">
-      <span class="${rankClass(i)}">${i + 1}</span>
-      <span class="issue-name">${issue.category}</span>
-      <span><span class="pill">${issue.count}</span></span>
-      <span class="issue-date">${daysAgoLabel(issue.lastOccurrence)}</span>
-      <span class="tags">${depts}${more}</span>
-      <span class="bar-arrow">&#9660;</span>
-    </div>
-    <div class="urgent-drill" id="${uid}" style="display:none"></div>`;
-  }).join('');
+    <div class="urgent-section">
+      <div class="urgent-section-hdr" style="--sc:${color}">${label}</div>
+      <div class="tbl" style="--tbl-cols:36px 1fr 90px 80px 32px">
+        ${tblHead}${issueRows(issues)}
+      </div>
+    </div>`;
+  }
 
   const body = `
-    <div class="tbl">
-      <div class="tbl-head">
-        <span>#</span><span>Issue Category</span>
-        <span>Occurrences</span><span>Last Seen</span>
-        <span>Departments Affected</span><span></span>
-      </div>
-      ${rows}
-    </div>`;
+    ${section('Service Failures', svcIssues, 'var(--gold)')}
+    ${section('Room &amp; Facility Issues', facIssues, '#4a90d9')}
+    ${section('F&amp;B Issues', fnbIssues, '#7cb87c')}`;
 
   return card(
-    `Top Urgent Issues \u2014 ${pl}`,
-    'Ranked by pattern frequency + recency \u00b7 Minimum 3 occurrences to qualify',
+    `Top Issues by Category \u2014 ${pl}`,
+    'Ranked by frequency + recency \u00b7 Minimum 2 occurrences \u00b7 Click any row to see breakdown',
     ts, body
   );
 }
@@ -1184,8 +1249,11 @@ function drillUrgent(cat, rowEl) {
   const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
   if (!startDate) return;
 
+  // Resolve aliases so a canonical name (e.g. "HVAC & Hot Water") matches
+  // records tagged with any of the original category names it was merged from.
+  const catAliases = new Set([cat].concat(CAT_ALIASES_OF[cat] || []));
   const matching = allRecords.filter(r => {
-    if (!(r.cats || []).includes(cat)) return false;
+    if (!(r.cats || []).some(c => catAliases.has(c))) return false;
     const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
     return d >= startDate && d <= endDate;
   });
@@ -1350,7 +1418,7 @@ function applyPeriod() {
   const ytd      = computeYTD(allRecords);
   const ts       = lastTs;
 
-  const urgent = buildUrgent(sections.urgentIssues, ts, pl);
+  const urgent = buildUrgent(sections.serviceIssues, sections.facilityIssues, sections.fnbIssues, ts, pl);
   const rooms  = buildRooms(sections.roomPatterns, ts, pl);
   const venues = buildVenues(sections.venuePatterns, ts, pl);
   const spaces = buildPublicSpaces(sections.publicSpacePatterns, ts, pl);
