@@ -559,6 +559,106 @@ var ISSUE_CLASSIFIERS = {
     { sub: 'Reservation / Availability',        keys: ['reservation','can\'t get','unable to get','hotel guest','hard to find seating','seating','no availability'] },
     { sub: 'Specific Dish Issue',               keys: ['pork chop','pancakes','curry','latte','hummus','smoothie','coffee','fettuccine','alfredo','oat latte','foam','dish'] },
   ],
+
+  'Room Comfort': [
+    { sub: 'Temperature / AC',                  keys: ['too cold','too warm','too hot','cold room','room cold','heat not','not cooling','not heating','hvac','thermostat','a/c','ac unit','freezing','stuffy','couldn\'t get warm','couldn\'t sleep','air conditioning'] },
+    { sub: 'Bed / Mattress',                    keys: ['bed','mattress','pillow','uncomfortable','too firm','too soft','hard mattress','sagging','lumpy','sleep','couldn\'t sleep well','no sleep'] },
+    { sub: 'Noise',                             keys: ['noise','noisy','loud','neighbor','hallway','thin wall','hear everything','dog barking','barking','drilling','construction','street','kept awake'] },
+    { sub: 'Odor / Smell',                      keys: ['smell','odor','musty','smoke','cigarette','mildew','stale','funky','bad smell','odour'] },
+    { sub: 'Room Size / Layout',                keys: ['small','cramped','tiny','layout','tight','closet','storage','no space','room size','too small'] },
+    { sub: 'Humidity / Air Quality',            keys: ['humid','humidity','stuffy','stuffy air','dry air','ventilation','airflow','damp'] },
+  ],
+
+  'HVAC/Temperature': [
+    { sub: 'Room Too Cold',                     keys: ['too cold','cold room','freezing','couldn\'t get warm','hvac blowing cold','cold air','not heating','heat not'] },
+    { sub: 'Room Too Warm / Hot',               keys: ['too warm','too hot','overheating','not cooling','no cool','sweating','a/c not work','ac not work','no a/c'] },
+    { sub: 'Thermostat Not Responding',         keys: ['thermostat','settings','target temp','couldn\'t control','not responding','override','reset'] },
+    { sub: 'HVAC Noise',                        keys: ['hvac noise','loud hvac','banging','rattling','fan noise','vent noise','blowing noise'] },
+  ],
+
+  'Noise Issues': [
+    { sub: 'Hallway / Neighboring Guests',      keys: ['hallway','neighbor','next door','corridor','door slam','voices','talking','party','thin wall','hear people','room next','adjacent'] },
+    { sub: 'Construction / Building Work',      keys: ['construction','drilling','drill','jackhammer','hammering','banging','renovation','sawing','power tools','early morning','7am','8am'] },
+    { sub: 'HVAC / Mechanical',                 keys: ['hvac','a/c','air condition','vent','fan','rattling','banging pipe','pipe','mechanical'] },
+    { sub: 'Pool / Patio / Music',              keys: ['pool','patio','bar','music','dj','band','event','outdoor','lobby bar','bass'] },
+    { sub: 'Street / External Noise',           keys: ['street','traffic','siren','outside','external','city noise','road'] },
+    { sub: 'Dog / Pet Noise',                   keys: ['dog','barking','pet','animal'] },
+  ],
+
+  'Cleanliness': [
+    { sub: 'Hair / Debris in Room',             keys: ['hair','floor dirty','crumbs','debris','dust','dirty floor','not vacuumed','vacuumed'] },
+    { sub: 'Bathroom Condition',                keys: ['bathroom','toilet','sink','shower','mold','mildew','grime','soap scum','stain bathroom','ring around','not clean bathroom'] },
+    { sub: 'Bedding / Linens',                  keys: ['sheets','sheet','pillowcase','linen','duvet','stain','soiled','not clean bed','not changed'] },
+    { sub: 'Surfaces / Windows',                keys: ['fingerprint','dusty','dust','window','mirror','countertop','surface','sticky','grimy'] },
+    { sub: 'Trash / Odor',                      keys: ['trash','garbage','smell','odor','bins','not emptied','leftover','prior guest','food smell'] },
+  ],
+
+  'Housekeeping Room Readiness': [
+    { sub: 'Room Not Ready at Arrival',         keys: ['not ready','room not ready','late check-in','wait for room','waited for room','still dirty','previous guest','not cleaned yet'] },
+    { sub: 'Supplies Missing',                  keys: ['missing','no towels','no coffee','no toiletries','not stocked','no amenities','no cups','no glasses','ran out','not provided'] },
+    { sub: 'Service Not Performed',             keys: ['not serviced','no housekeeping','not cleaned','skipped','service not done','never came','no service today'] },
+    { sub: 'Turndown Issue',                    keys: ['turndown','not turned','no turndown','turndown not done','late turndown','missed turndown'] },
+    { sub: 'Wrong Setup',                       keys: ['wrong room setup','not set up','incorrect setup','didn\'t match request','special request','not honored'] },
+  ],
+
+  'Room Lighting': [
+    { sub: 'Lights Not Working',                keys: ['not working','burned out','bulb out','broken light','flickering','lights out','won\'t turn on','broken bulb','lamp not'] },
+    { sub: 'Too Bright / No Blackout',          keys: ['too bright','blackout','curtain','light gap','light coming in','can\'t block','sunrise','street light'] },
+    { sub: 'Too Dark / Insufficient Light',     keys: ['too dark','not enough light','dim','can\'t see','poor lighting','low light','inadequate'] },
+    { sub: 'Controls Not Working',              keys: ['switch','control','panel','automated','timer','doesn\'t respond','bedside','won\'t turn off','won\'t turn on'] },
+  ],
+
+  'Technology/TV': [
+    { sub: 'TV Not Working / No Signal',        keys: ['tv not','no signal','black screen','frozen','no picture','channels','cable not','tv off','wont turn on'] },
+    { sub: 'Streaming / Casting',               keys: ['netflix','streaming','cast','airplay','chromecast','app','connect to tv','sign in','login','hulu','apple tv'] },
+    { sub: 'Remote / Controls',                 keys: ['remote','control','no remote','dead batteries','doesn\'t respond','remote not'] },
+    { sub: 'WiFi / Internet',                   keys: ['wifi','wi-fi','internet','slow connection','no connection','can\'t connect','dropped','bandwidth','network'] },
+    { sub: 'Phone / In-Room System',            keys: ['phone','in-room phone','not working phone','phone system','dial','call','voicemail'] },
+  ],
+
+  'In-Room Technology': [
+    { sub: 'TV / Entertainment',                keys: ['tv','television','screen','channels','streaming','netflix','remote','casting'] },
+    { sub: 'WiFi / Internet',                   keys: ['wifi','wi-fi','internet','connection','network','slow','can\'t connect'] },
+    { sub: 'Phone System',                      keys: ['phone','in-room phone','calling','dial','voicemail','phone not'] },
+    { sub: 'Bluetooth / Speakers',              keys: ['bluetooth','speaker','music','audio','pair','connect device'] },
+    { sub: 'USB / Charging',                    keys: ['usb','charging','outlet','charger','plug','charge phone','power'] },
+  ],
+
+  'Shower Issues': [
+    { sub: 'No Hot Water',                      keys: ['no hot water','cold water','cold shower','not hot','lukewarm','only cold','never gets hot'] },
+    { sub: 'Low Pressure',                      keys: ['pressure','low pressure','weak','trickle','not enough pressure'] },
+    { sub: 'Temperature Fluctuation',           keys: ['fluctuat','goes hot','goes cold','inconsistent','scalding','too hot','sudden cold'] },
+    { sub: 'Drain / Clog',                      keys: ['drain','slow drain','clog','backed up','standing water','won\'t drain'] },
+    { sub: 'Fixture / Hardware',                keys: ['shower head','showerhead','knob','handle','fixture','broken handle','diverter','leaking shower'] },
+  ],
+
+  'Room Bedding': [
+    { sub: 'Mattress Comfort',                  keys: ['mattress','too firm','too soft','uncomfortable','sagging','lumpy','springs','not supportive'] },
+    { sub: 'Pillow Issues',                     keys: ['pillow','no pillow','flat pillow','hard pillow','soft pillow','not enough pillows','extra pillow'] },
+    { sub: 'Linen / Duvet Quality',             keys: ['sheets','linen','duvet','blanket','cover','comforter','thread count','rough','thin','worn'] },
+    { sub: 'Missing / Inadequate Bedding',      keys: ['no blanket','no sheet','missing linen','not enough','extra blanket','not provided'] },
+  ],
+
+  'Room Amenities': [
+    { sub: 'Missing Amenities',                 keys: ['missing','not provided','no robe','no slippers','no coffee','no cups','no glasses','no amenity','wasn\'t there','not stocked'] },
+    { sub: 'Minibar / Refreshments',            keys: ['minibar','mini bar','water','snack','beverage','not stocked','empty','expired','not refreshed'] },
+    { sub: 'Coffee / Tea Setup',                keys: ['coffee maker','coffee','tea','nespresso','pod','kettle','not working coffee','no coffee supplies'] },
+    { sub: 'Robe / Slippers',                   keys: ['robe','slipper','not provided robe','wrong size','missing robe'] },
+  ],
+
+  'Bathroom Amenities': [
+    { sub: 'Toiletries Missing / Low Quality',  keys: ['shampoo','conditioner','body wash','lotion','soap','toiletries','not provided','low quality','small bottle','ran out'] },
+    { sub: 'Towels',                            keys: ['towel','hand towel','bath towel','face cloth','not enough towels','thin towel','worn towel','no clean towel'] },
+    { sub: 'Hair Dryer',                        keys: ['hair dryer','blowdryer','blow dryer','dryer not working','weak dryer'] },
+    { sub: 'Vanity / Mirror',                   keys: ['mirror','vanity','magnify','lighted mirror','not provided'] },
+  ],
+
+  'Room Doesn\'t Match Expectations': [
+    { sub: 'View Disappointing',                keys: ['view','parking garage','dumpster','no view','not the view','garage view','poor view','not what expected view'] },
+    { sub: 'Room Type / Size Wrong',            keys: ['room type','wrong room type','smaller than','not what booked','not what reserved','different room','mismatch','not what i expected'] },
+    { sub: 'Photos / Website Misleading',       keys: ['photos','website','advertised','different than','not like pictures','misrepresented','online photos','not matching','misleading'] },
+    { sub: 'Décor / Condition',                 keys: ['dated','old','worn','decor','not modern','condition','needs update','shabby','renovation'] },
+  ],
 };
 
 function classifyIssue(title, primaryCat) {
@@ -1123,25 +1223,12 @@ function drillUrgent(cat, rowEl) {
       ${subRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">Unable to classify issues.</div>'}`;
 
   } else {
-    // Fallback: by department
-    const deptMap = {};
-    for (const r of matching) {
-      if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
-    }
-    const topDepts = Object.entries(deptMap).map(([dept, count]) => ({ dept, count })).sort((a, b) => b.count - a.count);
-    const maxDept = topDepts.length ? topDepts[0].count : 1;
-    const deptRows = topDepts.map(({ dept, count }) => `
-      <div class="drill-row">
-        <span class="drill-cat">${dept}</span>
-        <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxDept*100).toFixed(1)}%"></div></div>
-        <span class="drill-cnt">${count}</span>
-      </div>`).join('');
+    // Fallback: show recent issue titles as the breakdown
     mainHtml = `
       <div class="drill-header">
-        <span>By Department</span>
+        <span>Issue Breakdown</span>
         <span class="drill-total">${matching.length} occurrences</span>
-      </div>
-      ${deptRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No department data.</div>'}`;
+      </div>`;
   }
 
   // ── Always show 5 most recent examples ──
