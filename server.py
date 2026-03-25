@@ -29,7 +29,7 @@ CACHE_TTL = 10 * 60  # seconds
 # infrastructure issues (broken phone, lighting, HVAC, plumbing, etc.)
 # rather than service quality issues.
 FACILITY_CATEGORIES = {
-    # Temperature & plumbing
+    # Temperature & plumbing (in-room)
     "Hot Water/HVAC",
     "HVAC/Temperature",
     "Room Comfort",
@@ -40,7 +40,6 @@ FACILITY_CATEGORIES = {
     "In-Room Technology",
     "Phone System Issues",
     "Technology/Phone System Issues",
-    "Fitness Center Entertainment",
     # Physical room condition
     "Room Lighting",
     "Room Comfort and Decor",
@@ -51,15 +50,36 @@ FACILITY_CATEGORIES = {
     "Cleanliness",
     "Housekeeping Room Readiness",
     "Room Doesn't Match Expectations",
-    # Pool & wellness facilities
+}
+
+# Facility issues specific to public/shared spaces (pool, lobby, fitness center).
+# These are physical defects — NOT service quality issues.
+PUBLIC_FACILITY_CATEGORIES = {
+    # Pool
     "Pool Too Cold",
     "Pool Too Small",
     "Pool Size",
+    "Pool Chair Availability",
+    # Fitness center
     "Wellness Equipment Maintenance",
-    # Public areas
+    "Fitness Center Entertainment",
+    # Lobby & common areas
     "Public Area Accessibility",
     "Lobby Comfort",
     "Lobby Experience",
+}
+
+# Maps public facility categories to a display space name
+PUBLIC_SPACE_MAP = {
+    "Pool Too Cold":               "Pool",
+    "Pool Too Small":              "Pool",
+    "Pool Size":                   "Pool",
+    "Pool Chair Availability":     "Pool",
+    "Wellness Equipment Maintenance": "Fitness Center",
+    "Fitness Center Entertainment":   "Fitness Center",
+    "Public Area Accessibility":   "Common Areas",
+    "Lobby Comfort":               "Lobby",
+    "Lobby Experience":            "Lobby",
 }
 
 FNB_DEPTS = {
@@ -224,7 +244,27 @@ def compute_dashboard(raw_records):
         })
     room_patterns.sort(key=lambda x: -x["count"])
 
-    # ── 3. Dept Patterns ────────────────────────────────────────────────────
+    # ── 3. Public Space Facility Issues ─────────────────────────────────────
+    public_space_map = {}
+    for r in last30:
+        for cat in r["issueCategories"]:
+            if cat not in PUBLIC_FACILITY_CATEGORIES:
+                continue
+            space = PUBLIC_SPACE_MAP.get(cat, "Other")
+            if space not in public_space_map:
+                public_space_map[space] = {"count": 0, "cats": set(), "last_date": None}
+            public_space_map[space]["count"] += 1
+            public_space_map[space]["cats"].add(cat)
+            if not public_space_map[space]["last_date"] or r["date"] > public_space_map[space]["last_date"]:
+                public_space_map[space]["last_date"] = r["date"]
+
+    public_space_patterns = sorted(
+        [{"space": s, "count": v["count"], "issues": sorted(v["cats"]), "lastDate": v["last_date"]}
+         for s, v in public_space_map.items()],
+        key=lambda x: -x["count"],
+    )
+
+    # ── 4. Dept Patterns ────────────────────────────────────────────────────
     dept_map = {}
     for r in last30:
         if r["department"]:
@@ -261,6 +301,7 @@ def compute_dashboard(raw_records):
     return {
         "urgentIssues": urgent,
         "roomPatterns": room_patterns,
+        "publicSpacePatterns": public_space_patterns,
         "deptPatterns": dept_patterns,
         "venuePatterns": venue_patterns,
         "ytd": {

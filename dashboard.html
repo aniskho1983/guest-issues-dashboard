@@ -453,6 +453,28 @@ function buildRooms(rooms, ts) {
   return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, body);
 }
 
+function buildPublicSpaces(spaces, ts) {
+  const body = (!spaces || !spaces.length)
+    ? '<div class="empty">No public space facility issues in the last 30 days.</div>'
+    : `<div class="room-grid">${spaces.map(s => `
+        <div class="room-card">
+          <div class="room-hdr">
+            <span class="room-num">${s.space}</span>
+            <span class="room-cnt">${s.count}×</span>
+          </div>
+          <div class="room-last">Last: ${fmtDate(s.lastDate)}</div>
+          <div class="chips">
+            ${s.issues.slice(0,4).map(c => `<span class="chip">${c}</span>`).join('')}
+            ${s.issues.length > 4 ? `<span class="chip chip-dim">+${s.issues.length - 4}</span>` : ''}
+          </div>
+        </div>`).join('')}</div>`;
+  return card(
+    'Public Space Facility Issues',
+    'Physical defects in shared areas — pool, lobby, fitness center · last 30 days',
+    ts, body
+  );
+}
+
 function buildDepts(depts, ts) {
   if (!depts || !depts.length) {
     return card('Recurrent Patterns by Department', 'Issue volume ranked by department — last 30 days', ts, '<div class="empty">No data for this period.</div>');
@@ -591,6 +613,7 @@ function renderDashboard(data) {
   const urgent  = buildUrgent(data.urgentIssues, ts);
   const rooms   = buildRooms(data.roomPatterns, ts);
   const venues  = buildVenues(data.venuePatterns, ts);
+  const spaces  = buildPublicSpaces(data.publicSpacePatterns, ts);
   const depts   = buildDepts(data.deptPatterns, ts);
   const ytd     = buildYTD(data.ytd, ts);
 
@@ -598,6 +621,7 @@ function renderDashboard(data) {
   dash.innerHTML = `
     ${urgent}
     <div class="two-col">${rooms}${venues}</div>
+    ${spaces}
     ${depts}
     ${ytd}
   `;
