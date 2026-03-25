@@ -155,10 +155,24 @@ def parse_record(page):
         items = p.get("Issue Summary", {}).get("title", [])
         return items[0]["plain_text"] if items else "(untitled)"
 
+    other_sub = (p.get("Other Subcategory", {}).get("select") or {}).get("name")
+
+    # Resolve "Other" to its subcategory when available.
+    # If "Other" has no subcategory, drop it — it adds no pattern value.
+    raw_cats = [s["name"] for s in p.get("Issue Category", {}).get("multi_select", [])]
+    resolved_cats = []
+    for cat in raw_cats:
+        if cat == "Other":
+            if other_sub and other_sub != "Other (needs review)":
+                resolved_cats.append(f"Other: {other_sub}")
+            # else drop bare "Other" entirely
+        else:
+            resolved_cats.append(cat)
+
     return {
         "id": page["id"],
         "issueTitle": title(),
-        "issueCategories": [s["name"] for s in p.get("Issue Category", {}).get("multi_select", [])],
+        "issueCategories": resolved_cats,
         "department": (p.get("Department", {}).get("select") or {}).get("name"),
         "room": txt("Room"),
         "status": (p.get("Status", {}).get("status") or {}).get("name"),
