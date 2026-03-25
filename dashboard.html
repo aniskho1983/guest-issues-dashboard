@@ -454,7 +454,7 @@ function buildRooms(rooms, ts) {
     return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, '<div class="empty">No rooms with 2+ facility issues in the last 30 days.</div>');
   }
 
-  const VISIBLE = 9;
+  const VISIBLE = 6;
   const visible = rooms.slice(0, VISIBLE);
   const extra   = rooms.slice(VISIBLE);
 
@@ -478,7 +478,7 @@ function buildRooms(rooms, ts) {
             '</div>' +
             '<div style="text-align:center;margin-top:16px">' +
               '<button class="see-more-btn" id="room-toggle-btn" data-count="' + extra.length + '" onclick="toggleRooms()">' +
-                'See ' + extra.length + ' more rooms &#9660;' +
+                'See more rooms &#9660;' +
               '</button>' +
             '</div>';
   }
@@ -492,7 +492,7 @@ function toggleRooms() {
   var count = btn.getAttribute('data-count');
   var open  = wrap.style.display !== 'none';
   wrap.style.display = open ? 'none' : 'block';
-  btn.innerHTML = open ? 'See ' + count + ' more rooms &#9660;' : '&#9650; Show fewer';
+  btn.innerHTML = open ? 'See more rooms &#9660;' : '&#9650; Show fewer';
 }
 
 function buildPublicSpaces(spaces, ts) {
