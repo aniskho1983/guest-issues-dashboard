@@ -280,6 +280,46 @@
     }
     .see-more-btn:hover { background: var(--gold-faint); border-color: var(--gold); }
 
+    /* ── Period Bar ── */
+    .period-bar {
+      background: rgba(11,11,15,.97);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .period-inner {
+      max-width: 1240px; margin: 0 auto;
+      display: flex; align-items: center;
+      gap: 16px; padding: 10px 0;
+      flex-wrap: wrap;
+    }
+    .period-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .period-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 500;
+      letter-spacing: .04em;
+      padding: 6px 14px; border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+      white-space: nowrap;
+    }
+    .period-btn:hover { border-color: var(--gold-border); color: var(--gold); }
+    .period-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-light); }
+    .custom-range { display: flex; align-items: center; gap: 8px; }
+    .custom-range input[type="date"] {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      padding: 5px 10px; border-radius: var(--r-sm);
+      outline: none; cursor: pointer;
+    }
+    .custom-range input[type="date"]:focus { border-color: var(--gold-border); }
+    .range-sep { color: var(--text-3); font-size: 12px; }
+
     /* ── Responsive ── */
     @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
     @media (max-width: 768px) {
@@ -318,6 +358,25 @@
   </div>
 </header>
 
+<!-- ── Period Filter ─────────────────────────────────────────────────────── -->
+<div class="period-bar">
+  <div class="period-inner">
+    <div class="period-btns">
+      <button class="period-btn" data-period="7d" onclick="selectPeriod('7d')">7 Days</button>
+      <button class="period-btn" data-period="mtd" onclick="selectPeriod('mtd')">MTD</button>
+      <button class="period-btn active" data-period="30d" onclick="selectPeriod('30d')">Last 30 Days</button>
+      <button class="period-btn" data-period="90d" onclick="selectPeriod('90d')">Last 90 Days</button>
+      <button class="period-btn" data-period="ytd" onclick="selectPeriod('ytd')">YTD</button>
+      <button class="period-btn" data-period="custom" onclick="selectPeriod('custom')">Custom</button>
+    </div>
+    <div class="custom-range" id="customRange" style="display:none">
+      <input type="date" id="customFrom" onchange="applyCustom()" />
+      <span class="range-sep">&#8594;</span>
+      <input type="date" id="customTo" onchange="applyCustom()" />
+    </div>
+  </div>
+</div>
+
 <!-- ── Main ──────────────────────────────────────────────────────────────── -->
 <main class="app-main">
   <div id="state-area"></div>
@@ -331,12 +390,41 @@
 
 <script>
 // ── Mode detection ─────────────────────────────────────────────────────────
-// If window.DASHBOARD_DATA exists, we're running as a static GitHub Pages site.
-// Otherwise we're running locally against the Python API server.
 const STATIC_MODE = !!window.DASHBOARD_DATA;
 
+// ── Constants (mirror server.py) ──────────────────────────────────────────
+var FACILITY_CATS = new Set([
+  "Hot Water/HVAC","HVAC/Temperature","Room Comfort","Shower Issues",
+  "Technology/TV","In-Room Tech Issues","In-Room Technology",
+  "Phone System Issues","Technology/Phone System Issues",
+  "Room Lighting","Room Comfort and Decor","Room Bedding","Room Amenities",
+  "Bathroom Amenities","Noise Issues","Cleanliness",
+  "Housekeeping Room Readiness","Room Doesn't Match Expectations"
+]);
+
+var PUBLIC_SPACE_MAP = {
+  "Pool Too Cold":"Pool","Pool Too Small":"Pool","Pool Size":"Pool",
+  "Pool Chair Availability":"Pool",
+  "Wellness Equipment Maintenance":"Fitness Center",
+  "Fitness Center Entertainment":"Fitness Center",
+  "Public Area Accessibility":"Common Areas",
+  "Lobby Comfort":"Lobby","Lobby Experience":"Lobby"
+};
+
+var FNB_DEPTS = new Set([
+  "F&B - Peacock","F&B - La Piscina","F&B - IRD",
+  "F&B - Peacock Lounge","F&B - Quill","F&B - Goldie's","F&B - Kappo Kappo"
+]);
+
+// ── State ──────────────────────────────────────────────────────────────────
+var trendChart = null;
+var allRecords = [];
+var lastTs = null;
+var currentPeriod = '30d';
+var customFromVal = '';
+var customToVal = '';
+
 // ── Utilities ──────────────────────────────────────────────────────────────
-let trendChart = null;
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -393,6 +481,155 @@ function initHeaderAction() {
   }
 }
 
+// ── Period helpers ─────────────────────────────────────────────────────────
+function getPeriodRange(period, fromVal, toVal) {
+  const now = new Date();
+  const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59));
+  if (period === '7d') {
+    const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6));
+    return [s, todayEnd];
+  }
+  if (period === 'mtd') {
+    return [new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), todayEnd];
+  }
+  if (period === '30d') {
+    const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 29));
+    return [s, todayEnd];
+  }
+  if (period === '90d') {
+    const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 89));
+    return [s, todayEnd];
+  }
+  if (period === 'ytd') {
+    return [new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), todayEnd];
+  }
+  if (period === 'custom' && fromVal && toVal) {
+    return [new Date(fromVal + 'T00:00:00Z'), new Date(toVal + 'T23:59:59Z')];
+  }
+  return [null, null];
+}
+
+function getPeriodLabel(period, startDate, endDate) {
+  const opts = { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' };
+  if (period === '7d')  return 'Last 7 Days';
+  if (period === 'mtd') return 'Month to Date';
+  if (period === '30d') return 'Last 30 Days';
+  if (period === '90d') return 'Last 90 Days';
+  if (period === 'ytd') return 'Year to Date';
+  if (period === 'custom' && startDate && endDate) {
+    return startDate.toLocaleDateString('en-US', opts) + ' \u2013 ' + endDate.toLocaleDateString('en-US', opts);
+  }
+  return 'Custom Range';
+}
+
+// ── Compute sections from raw records ─────────────────────────────────────
+function computeSections(records, startDate, endDate) {
+  const filtered = records.filter(r => {
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    return d >= startDate && d <= endDate;
+  });
+
+  const now = new Date();
+  const periodDays = (endDate - startDate) / 86400000 || 1;
+
+  // ── Urgent Issues (top 10, min 3 occurrences) ──
+  const catMap = {};
+  for (const r of filtered) {
+    for (const cat of (r.cats || [])) {
+      if (!catMap[cat]) catMap[cat] = { count: 0, lastDate: null, depts: {} };
+      catMap[cat].count++;
+      if (!catMap[cat].lastDate || r.date > catMap[cat].lastDate) catMap[cat].lastDate = r.date;
+      if (r.dept) catMap[cat].depts[r.dept] = true;
+    }
+  }
+  const maxCount = Math.max(1, ...Object.values(catMap).map(v => v.count));
+  const urgentIssues = Object.entries(catMap)
+    .filter(([, v]) => v.count >= 3)
+    .map(([cat, v]) => {
+      const daysAgo = (now - new Date(v.lastDate + (v.lastDate.length === 10 ? 'T00:00:00Z' : ''))) / 86400000;
+      const recency = Math.max(0, 1 - daysAgo / periodDays);
+      const score = 0.6 * (v.count / maxCount) + 0.4 * recency;
+      return { category: cat, count: v.count, lastOccurrence: v.lastDate, departments: Object.keys(v.depts), score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  // ── Room Patterns (facility only, 2+ occurrences) ──
+  const roomMap = {};
+  for (const r of filtered) {
+    if (!r.room) continue;
+    const fCats = (r.cats || []).filter(c => FACILITY_CATS.has(c));
+    if (!fCats.length) continue;
+    if (!roomMap[r.room]) roomMap[r.room] = { count: 0, lastDate: null, cats: {} };
+    roomMap[r.room].count++;
+    if (!roomMap[r.room].lastDate || r.date > roomMap[r.room].lastDate) roomMap[r.room].lastDate = r.date;
+    fCats.forEach(c => roomMap[r.room].cats[c] = true);
+  }
+  const roomPatterns = Object.entries(roomMap)
+    .filter(([, v]) => v.count >= 2)
+    .map(([room, v]) => ({ room, count: v.count, lastDate: v.lastDate, issueTypes: Object.keys(v.cats) }))
+    .sort((a, b) => b.count - a.count);
+
+  // ── Public Space Issues ──
+  const spaceMap = {};
+  for (const r of filtered) {
+    const spacesHit = {};
+    for (const cat of (r.cats || [])) {
+      const space = PUBLIC_SPACE_MAP[cat];
+      if (!space) continue;
+      if (!spaceMap[space]) spaceMap[space] = { count: 0, lastDate: null, issues: {} };
+      if (!spacesHit[space]) { spaceMap[space].count++; spacesHit[space] = true; }
+      if (!spaceMap[space].lastDate || r.date > spaceMap[space].lastDate) spaceMap[space].lastDate = r.date;
+      spaceMap[space].issues[cat] = true;
+    }
+  }
+  const publicSpacePatterns = Object.entries(spaceMap)
+    .map(([space, v]) => ({ space, count: v.count, lastDate: v.lastDate, issues: Object.keys(v.issues) }))
+    .sort((a, b) => b.count - a.count);
+
+  // ── Department Patterns ──
+  const deptCounts = {};
+  for (const r of filtered) {
+    if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1;
+  }
+  const deptPatterns = Object.entries(deptCounts)
+    .map(([dept, count]) => ({ dept, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const venuePatterns = deptPatterns.filter(d => FNB_DEPTS.has(d.dept));
+
+  return { urgentIssues, roomPatterns, publicSpacePatterns, deptPatterns, venuePatterns };
+}
+
+function computeYTD(records) {
+  const now = new Date();
+  const ytdStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const ytdEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59));
+  const filtered = records.filter(r => {
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    return d >= ytdStart && d <= ytdEnd;
+  });
+
+  const deptMap = {}, monthMap = {};
+  for (const r of filtered) {
+    if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    monthMap[key] = (monthMap[key] || 0) + 1;
+  }
+
+  const byDepartment = Object.entries(deptMap)
+    .map(([dept, count]) => ({ dept, count })).sort((a, b) => b.count - a.count);
+  const byVenue = byDepartment.filter(d => FNB_DEPTS.has(d.dept));
+  const monthlyTrend = Object.keys(monthMap).sort().map(key => {
+    const [y, m] = key.split('-');
+    const d = new Date(Date.UTC(+y, +m - 1, 1));
+    return { month: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }), count: monthMap[key] };
+  });
+
+  return { total: filtered.length, byDepartment, byVenue, monthlyTrend };
+}
+
 // ── Section builders ───────────────────────────────────────────────────────
 function card(title, sub, ts, body) {
   return `
@@ -408,11 +645,12 @@ function card(title, sub, ts, body) {
     </div>`;
 }
 
-function buildUrgent(issues, ts) {
+function buildUrgent(issues, ts, pl) {
+  pl = pl || 'Last 30 Days';
   if (!issues || !issues.length) {
     return card(
-      'Top Urgent Issues — Last 30 Days',
-      'Ranked by pattern frequency + recency · Minimum 3 occurrences to qualify',
+      `Top Urgent Issues \u2014 ${pl}`,
+      'Ranked by pattern frequency + recency \u00b7 Minimum 3 occurrences to qualify',
       ts,
       '<div class="empty">No issue patterns meet the urgency threshold yet.</div>'
     );
@@ -443,15 +681,16 @@ function buildUrgent(issues, ts) {
     </div>`;
 
   return card(
-    'Top Urgent Issues — Last 30 Days',
-    'Ranked by pattern frequency + recency · Minimum 3 occurrences to qualify',
+    `Top Urgent Issues \u2014 ${pl}`,
+    'Ranked by pattern frequency + recency \u00b7 Minimum 3 occurrences to qualify',
     ts, body
   );
 }
 
-function buildRooms(rooms, ts) {
+function buildRooms(rooms, ts, pl) {
+  pl = pl || 'Last 30 Days';
   if (!rooms || !rooms.length) {
-    return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, '<div class="empty">No rooms with 2+ facility issues in the last 30 days.</div>');
+    return card('Recurrent Patterns by Room', `Facility issues only \u00b7 2+ occurrences \u00b7 ${pl}`, ts, '<div class="empty">No rooms with 2+ facility issues in this period.</div>');
   }
 
   const VISIBLE = 6;
@@ -483,7 +722,7 @@ function buildRooms(rooms, ts) {
             '</div>';
   }
 
-  return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, body);
+  return card('Recurrent Patterns by Room', `Facility issues only \u00b7 2+ occurrences \u00b7 ${pl}`, ts, body);
 }
 
 function toggleRooms() {
@@ -495,14 +734,15 @@ function toggleRooms() {
   btn.innerHTML = open ? 'See more rooms &#9660;' : '&#9650; Show fewer';
 }
 
-function buildPublicSpaces(spaces, ts) {
+function buildPublicSpaces(spaces, ts, pl) {
+  pl = pl || 'Last 30 Days';
   const body = (!spaces || !spaces.length)
-    ? '<div class="empty">No public space facility issues in the last 30 days.</div>'
+    ? '<div class="empty">No public space facility issues in this period.</div>'
     : `<div class="room-grid">${spaces.map(s => `
         <div class="room-card">
           <div class="room-hdr">
             <span class="room-num">${s.space}</span>
-            <span class="room-cnt">${s.count}×</span>
+            <span class="room-cnt">${s.count}\u00d7</span>
           </div>
           <div class="room-last">Last: ${fmtDate(s.lastDate)}</div>
           <div class="chips">
@@ -512,14 +752,15 @@ function buildPublicSpaces(spaces, ts) {
         </div>`).join('')}</div>`;
   return card(
     'Public Space Facility Issues',
-    'Physical defects in shared areas — pool, lobby, fitness center · last 30 days',
+    `Physical defects in shared areas \u2014 pool, lobby, fitness center \u00b7 ${pl}`,
     ts, body
   );
 }
 
-function buildDepts(depts, ts) {
+function buildDepts(depts, ts, pl) {
+  pl = pl || 'Last 30 Days';
   if (!depts || !depts.length) {
-    return card('Recurrent Patterns by Department', 'Issue volume ranked by department — last 30 days', ts, '<div class="empty">No data for this period.</div>');
+    return card('Recurrent Patterns by Department', `Issue volume ranked by department \u2014 ${pl}`, ts, '<div class="empty">No data for this period.</div>');
   }
   const max = Math.max(...depts.map(d => d.count), 1);
   const rows = depts.map((d, i) => `
@@ -530,19 +771,20 @@ function buildDepts(depts, ts) {
       </div>
       <span class="bar-num">${d.count}</span>
     </div>`).join('');
-  return card('Recurrent Patterns by Department', 'Issue volume ranked by department — last 30 days', ts, `<div class="bar-list">${rows}</div>`);
+  return card('Recurrent Patterns by Department', `Issue volume ranked by department \u2014 ${pl}`, ts, `<div class="bar-list">${rows}</div>`);
 }
 
-function buildVenues(venues, ts) {
+function buildVenues(venues, ts, pl) {
+  pl = pl || 'Last 30 Days';
   const body = (!venues || !venues.length)
-    ? '<div class="empty">No F&B venue data for this period.</div>'
+    ? '<div class="empty">No F&amp;B venue data for this period.</div>'
     : `<div class="venue-grid">${venues.map(v => `
         <div class="venue-card">
           <div class="venue-name">${stripFnb(v.dept)}</div>
           <div class="venue-num">${v.count}</div>
           <div class="venue-lbl">issues</div>
         </div>`).join('')}</div>`;
-  return card('Recurrent Patterns by Restaurant & Venue', 'F&B venues only — last 30 days', ts, body);
+  return card('Recurrent Patterns by Restaurant &amp; Venue', `F&amp;B venues only \u2014 ${pl}`, ts, body);
 }
 
 function buildYTD(ytd, ts) {
@@ -640,42 +882,59 @@ function drawChart(monthlyTrend) {
   });
 }
 
-// ── Render ─────────────────────────────────────────────────────────────────
-function renderDashboard(data) {
-  const ts = data.lastUpdated;
+// ── Period selection ───────────────────────────────────────────────────────
+function selectPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-period') === period);
+  });
+  const cr = document.getElementById('customRange');
+  cr.style.display = period === 'custom' ? 'flex' : 'none';
+  if (period !== 'custom') applyPeriod();
+}
 
-  // Header meta
-  document.getElementById('meta').innerHTML = `
-    Live · Notion Guest Issues Task Tracker
-    <span class="sep">·</span>${data.totalRecords} records
-    <span class="sep">·</span>${data.last30Count} last 30d
-    <span class="sep">·</span>${data.ytdCount} YTD`;
+function applyCustom() {
+  customFromVal = document.getElementById('customFrom').value;
+  customToVal   = document.getElementById('customTo').value;
+  if (customFromVal && customToVal) applyPeriod();
+}
 
-  // Build sections
-  const urgent  = buildUrgent(data.urgentIssues, ts);
-  const rooms   = buildRooms(data.roomPatterns, ts);
-  const venues  = buildVenues(data.venuePatterns, ts);
-  const spaces  = buildPublicSpaces(data.publicSpacePatterns, ts);
-  const depts   = buildDepts(data.deptPatterns, ts);
-  const ytd     = buildYTD(data.ytd, ts);
+function applyPeriod() {
+  if (!allRecords.length) return;
+  const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
+  if (!startDate) return;
+  const pl       = getPeriodLabel(currentPeriod, startDate, endDate);
+  const sections = computeSections(allRecords, startDate, endDate);
+  const ytd      = computeYTD(allRecords);
+  const ts       = lastTs;
+
+  const urgent = buildUrgent(sections.urgentIssues, ts, pl);
+  const rooms  = buildRooms(sections.roomPatterns, ts, pl);
+  const venues = buildVenues(sections.venuePatterns, ts, pl);
+  const spaces = buildPublicSpaces(sections.publicSpacePatterns, ts, pl);
+  const depts  = buildDepts(sections.deptPatterns, ts, pl);
+  const ytdHtml = buildYTD(ytd, ts);
 
   const dash = document.getElementById('dashboard');
-  dash.innerHTML = `
-    ${urgent}
-    <div class="two-col">${rooms}${venues}</div>
-    ${spaces}
-    ${depts}
-    ${ytd}
-  `;
+  dash.innerHTML = `${urgent}<div class="two-col">${rooms}${venues}</div>${spaces}${depts}${ytdHtml}`;
   dash.style.display = 'flex';
 
-  // Draw chart after DOM update
-  setTimeout(() => drawChart(data.ytd && data.ytd.monthlyTrend), 50);
+  setTimeout(() => drawChart(ytd && ytd.monthlyTrend), 50);
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderDashboard(data) {
+  allRecords = data.records || [];
+  lastTs     = data.lastUpdated;
+
+  document.getElementById('meta').innerHTML =
+    `Live \u00b7 Notion Guest Issues Task Tracker<span class="sep">\u00b7</span>${data.totalRecords} records`;
+
+  applyPeriod();
 }
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
 async function loadDashboard(bust = false) {
-  // Static mode: data is already embedded — just render it
   if (STATIC_MODE && !bust) {
     renderDashboard(window.DASHBOARD_DATA);
     return;
@@ -689,7 +948,7 @@ async function loadDashboard(bust = false) {
     document.getElementById('state-area').innerHTML = `
       <div class="state-box">
         <div class="spinner"></div>
-        <p class="state-text">Pulling live data from Notion…</p>
+        <p class="state-text">Pulling live data from Notion\u2026</p>
       </div>`;
   }
 
@@ -703,7 +962,7 @@ async function loadDashboard(bust = false) {
   } catch (e) {
     document.getElementById('state-area').innerHTML = `
       <div class="state-box">
-        <p class="state-err">⚠ Unable to load dashboard</p>
+        <p class="state-err">\u26a0 Unable to load dashboard</p>
         <p class="state-code">${e.message}</p>
       </div>`;
     if (bust) document.getElementById('dashboard').style.display = 'flex';

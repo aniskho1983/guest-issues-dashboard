@@ -35,8 +35,7 @@ def main():
     print(f"Fetched {len(raw_records)} records")
 
     data = compute_dashboard(raw_records)
-    print(f"Computed dashboard — {data['totalRecords']} records, "
-          f"{data['last30Count']} last 30d, {data['ytdCount']} YTD")
+    print(f"Computed dashboard — {data['totalRecords']} records")
 
     # Read the HTML template
     template_path = Path(__file__).parent / "dashboard.html"

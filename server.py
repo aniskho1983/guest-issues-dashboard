@@ -184,156 +184,20 @@ def parse_record(page):
 # ── Dashboard computation ────────────────────────────────────────────────────
 def compute_dashboard(raw_records):
     now = datetime.now(timezone.utc)
-    thirty_days_ago = now - timedelta(days=30)
-    start_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
     records = [parse_record(r) for r in raw_records]
     records = [r for r in records if r["date"]]
 
-    def parse_date(s):
-        # handles both "YYYY-MM-DD" and "YYYY-MM-DDTHH:MM:SS..."
-        s = s[:10]
-        return datetime(int(s[:4]), int(s[5:7]), int(s[8:10]), tzinfo=timezone.utc)
-
-    last30 = [r for r in records if parse_date(r["date"]) >= thirty_days_ago]
-    ytd    = [r for r in records if parse_date(r["date"]) >= start_of_year]
-
-    # ── 1. Top Urgent Issues ────────────────────────────────────────────────
-    cat_map = {}
-    for r in last30:
-        for cat in r["issueCategories"]:
-            if cat not in cat_map:
-                cat_map[cat] = {"count": 0, "last_date": None, "depts": set()}
-            cat_map[cat]["count"] += 1
-            if not cat_map[cat]["last_date"] or r["date"] > cat_map[cat]["last_date"]:
-                cat_map[cat]["last_date"] = r["date"]
-            if r["department"]:
-                cat_map[cat]["depts"].add(r["department"])
-
-    max_count = max((v["count"] for v in cat_map.values()), default=1)
-
-    urgent = []
-    for cat, v in cat_map.items():
-        if v["count"] < 3:
-            continue
-        days_since = (now - parse_date(v["last_date"])).total_seconds() / 86400
-        recency = max(0.0, 1 - days_since / 30)
-        score = (v["count"] / max_count) * 0.6 + recency * 0.4
-        urgent.append({
-            "category": cat,
-            "count": v["count"],
-            "lastOccurrence": v["last_date"],
-            "departments": sorted(v["depts"]),
-            "score": round(score, 3),
-        })
-    urgent.sort(key=lambda x: (-x["score"], -x["count"]))
-    urgent = urgent[:10]
-
-    # ── 2. Room Patterns (facility issues only) ─────────────────────────────
-    # Only count records that have at least one facility-related category.
-    # Strip non-facility categories from the display chips too.
-    room_map = {}
-    for r in last30:
-        if not r["room"]:
-            continue
-        facility_cats = [c for c in r["issueCategories"] if c in FACILITY_CATEGORIES]
-        if not facility_cats:
-            continue  # skip service-only issues entirely
-        rm = r["room"]
-        if rm not in room_map:
-            room_map[rm] = {"count": 0, "cats": set(), "dates": []}
-        room_map[rm]["count"] += 1
-        room_map[rm]["cats"].update(facility_cats)
-        room_map[rm]["dates"].append(r["date"])
-
-    room_patterns = []
-    for rm, v in room_map.items():
-        if v["count"] < 2:
-            continue
-        room_patterns.append({
-            "room": rm,
-            "count": v["count"],
-            "issueTypes": sorted(v["cats"]),
-            "lastDate": sorted(v["dates"])[-1],
-        })
-    room_patterns.sort(key=lambda x: -x["count"])
-
-    # ── 3. Public Space Facility Issues ─────────────────────────────────────
-    public_space_map = {}
-    for r in last30:
-        for cat in r["issueCategories"]:
-            if cat not in PUBLIC_FACILITY_CATEGORIES:
-                continue
-            space = PUBLIC_SPACE_MAP.get(cat, "Other")
-            if space not in public_space_map:
-                public_space_map[space] = {"count": 0, "cats": set(), "last_date": None}
-            public_space_map[space]["count"] += 1
-            public_space_map[space]["cats"].add(cat)
-            if not public_space_map[space]["last_date"] or r["date"] > public_space_map[space]["last_date"]:
-                public_space_map[space]["last_date"] = r["date"]
-
-    public_space_patterns = sorted(
-        [{"space": s, "count": v["count"], "issues": sorted(v["cats"]), "lastDate": v["last_date"]}
-         for s, v in public_space_map.items()],
-        key=lambda x: -x["count"],
-    )
-
-    # ── 4. Dept Patterns ────────────────────────────────────────────────────
-    dept_map = {}
-    for r in last30:
-        if r["department"]:
-            dept_map[r["department"]] = dept_map.get(r["department"], 0) + 1
-    dept_patterns = sorted(
-        [{"dept": d, "count": c} for d, c in dept_map.items()],
-        key=lambda x: -x["count"],
-    )
-
-    # ── 4. Venue Patterns (F&B only) ────────────────────────────────────────
-    venue_patterns = [d for d in dept_patterns if d["dept"] in FNB_DEPTS]
-
-    # ── 5. YTD ──────────────────────────────────────────────────────────────
-    ytd_dept_map = {}
-    for r in ytd:
-        if r["department"]:
-            ytd_dept_map[r["department"]] = ytd_dept_map.get(r["department"], 0) + 1
-
-    month_map = {}
-    for r in ytd:
-        m = r["date"][:7]  # "YYYY-MM"
-        month_map[m] = month_map.get(m, 0) + 1
-
-    def month_label(ym):
-        y, mo = int(ym[:4]), int(ym[5:7])
-        months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-        return f"{months[mo-1]} '{str(y)[2:]}"
-
-    monthly_trend = [
-        {"month": month_label(m), "count": c}
-        for m, c in sorted(month_map.items())
+    # Compact format for client-side computation — keeps payload small
+    compact = [
+        {"date": r["date"], "cats": r["issueCategories"], "dept": r["department"], "room": r["room"]}
+        for r in records
     ]
 
     return {
-        "urgentIssues": urgent,
-        "roomPatterns": room_patterns,
-        "publicSpacePatterns": public_space_patterns,
-        "deptPatterns": dept_patterns,
-        "venuePatterns": venue_patterns,
-        "ytd": {
-            "total": len(ytd),
-            "byDepartment": sorted(
-                [{"dept": d, "count": c} for d, c in ytd_dept_map.items()],
-                key=lambda x: -x["count"],
-            ),
-            "byVenue": sorted(
-                [{"dept": d, "count": c} for d, c in ytd_dept_map.items() if d in FNB_DEPTS],
-                key=lambda x: -x["count"],
-            ),
-            "monthlyTrend": monthly_trend,
-        },
+        "records": compact,
         "lastUpdated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "totalRecords": len(records),
-        "last30Count": len(last30),
-        "ytdCount": len(ytd),
     }
 
 
