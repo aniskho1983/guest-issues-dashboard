@@ -231,12 +231,51 @@
     .chip-dim { color: var(--text-3); }
 
     /* ── Dept Bar List ── */
-    .bar-list { display: flex; flex-direction: column; gap: 9px; }
-    .bar-row { display: grid; grid-template-columns: 185px 1fr 38px; align-items: center; gap: 12px; }
+    .bar-list { display: flex; flex-direction: column; gap: 0; }
+    .bar-row {
+      display: grid; grid-template-columns: 185px 1fr 38px 20px;
+      align-items: center; gap: 12px;
+      padding: 7px 6px; border-radius: var(--r-sm);
+      cursor: pointer; transition: background .14s;
+    }
+    .bar-row:hover { background: var(--gold-faint); }
+    .bar-row.active { background: var(--gold-faint); }
     .bar-label { font-size: 13px; color: var(--text); }
     .bar-track { height: 5px; background: rgba(0,0,0,.07); border-radius: 3px; overflow: hidden; }
     .bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius: 3px; }
     .bar-num { font-size: 13px; font-weight: 600; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
+    .bar-arrow { font-size: 10px; color: var(--text-3); text-align: center; transition: transform .2s; }
+    .bar-row.active .bar-arrow { transform: rotate(180deg); }
+
+    /* ── Dept Drill-down ── */
+    .dept-drill {
+      margin: 2px 6px 6px 6px;
+      padding: 14px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      animation: fadeIn .15s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .drill-header {
+      font-size: 10px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text-3);
+      margin-bottom: 10px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+    }
+    .drill-total { font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .drill-row {
+      display: grid; grid-template-columns: 1fr 90px 32px;
+      align-items: center; gap: 10px;
+      padding: 5px 0; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .drill-row:last-child { border-bottom: none; }
+    .drill-cat { color: var(--text); }
+    .drill-bar-wrap { height: 4px; background: rgba(0,0,0,.06); border-radius: 2px; overflow: hidden; }
+    .drill-bar-fill { height: 100%; background: var(--gold); border-radius: 2px; opacity: .7; }
+    .drill-cnt { font-size: 12px; font-weight: 600; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
 
     /* ── Venue Cards ── */
     .venue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; }
@@ -759,21 +798,31 @@ function buildPublicSpaces(spaces, ts, pl) {
   );
 }
 
+function deptSafeId(dept) {
+  return 'drill-' + dept.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+}
+
 function buildDepts(depts, ts, pl) {
   pl = pl || 'Last 30 Days';
   if (!depts || !depts.length) {
     return card('Recurrent Patterns by Department', `Issue volume ranked by department \u2014 ${pl}`, ts, '<div class="empty">No data for this period.</div>');
   }
   const max = Math.max(...depts.map(d => d.count), 1);
-  const rows = depts.map((d, i) => `
-    <div class="bar-row">
+  const rows = depts.map((d, i) => {
+    const sid = deptSafeId(d.dept);
+    const esc = d.dept.replace(/'/g, "\\'");
+    return `
+    <div class="bar-row" onclick="drillDept('${esc}', this)">
       <span class="bar-label">${d.dept}</span>
       <div class="bar-track">
         <div class="bar-fill" style="width:${(d.count/max*100).toFixed(1)}%;opacity:${Math.max(0.35,1-i*0.055).toFixed(2)}"></div>
       </div>
       <span class="bar-num">${d.count}</span>
-    </div>`).join('');
-  return card('Recurrent Patterns by Department', `Issue volume ranked by department \u2014 ${pl}`, ts, `<div class="bar-list">${rows}</div>`);
+      <span class="bar-arrow">&#9660;</span>
+    </div>
+    <div class="dept-drill" id="${sid}" style="display:none"></div>`;
+  }).join('');
+  return card('Recurrent Patterns by Department', `Issue volume ranked by department \u2014 ${pl} \u00b7 Click any row to drill down`, ts, `<div class="bar-list">${rows}</div>`);
 }
 
 function buildVenues(venues, ts, pl) {
@@ -884,6 +933,74 @@ function drawChart(monthlyTrend) {
   });
 }
 
+// ── Department drill-down ──────────────────────────────────────────────────
+let activeDept = null;
+
+function drillDept(dept, rowEl) {
+  const sid = deptSafeId(dept);
+  const panel = document.getElementById(sid);
+  if (!panel) return;
+
+  // Collapse if already open
+  if (activeDept === dept) {
+    panel.style.display = 'none';
+    rowEl.classList.remove('active');
+    activeDept = null;
+    return;
+  }
+
+  // Close any previously open panel
+  if (activeDept) {
+    const prev = document.getElementById(deptSafeId(activeDept));
+    if (prev) prev.style.display = 'none';
+    document.querySelectorAll('.bar-row.active').forEach(r => r.classList.remove('active'));
+  }
+
+  activeDept = dept;
+  rowEl.classList.add('active');
+
+  // Compute top categories for this dept in current period
+  const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
+  if (!startDate) return;
+
+  const filtered = allRecords.filter(r => {
+    if (r.dept !== dept) return false;
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    return d >= startDate && d <= endDate;
+  });
+
+  const catMap = {};
+  for (const r of filtered) {
+    for (const cat of (r.cats || [])) {
+      catMap[cat] = (catMap[cat] || 0) + 1;
+    }
+  }
+
+  const topCats = Object.entries(catMap)
+    .map(([cat, count]) => ({ cat, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const maxCat = topCats.length ? topCats[0].count : 1;
+
+  const rows = topCats.length
+    ? topCats.map(({ cat, count }) => `
+        <div class="drill-row">
+          <span class="drill-cat">${cat}</span>
+          <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxCat*100).toFixed(1)}%"></div></div>
+          <span class="drill-cnt">${count}</span>
+        </div>`).join('')
+    : '<div class="empty" style="padding:12px">No categorized issues found.</div>';
+
+  panel.innerHTML = `
+    <div class="drill-header">
+      <span>Top Issue Categories</span>
+      <span class="drill-total">${filtered.length} issue${filtered.length !== 1 ? 's' : ''} total</span>
+    </div>
+    ${rows}`;
+  panel.style.display = 'block';
+}
+
 // ── Period selection ───────────────────────────────────────────────────────
 function selectPeriod(period) {
   currentPeriod = period;
@@ -902,6 +1019,7 @@ function applyCustom() {
 }
 
 function applyPeriod() {
+  activeDept = null;
   if (!allRecords.length) return;
   const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
   if (!startDate) return;
