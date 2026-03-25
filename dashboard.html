@@ -266,6 +266,20 @@
     .app-footer { border-top: 1px solid var(--border); padding: 18px 24px; text-align: center; }
     .app-footer p { font-size: 10.5px; color: var(--text-4); letter-spacing: .1em; text-transform: uppercase; }
 
+    .see-more-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: transparent;
+      border: 1px solid var(--gold-border);
+      color: var(--gold);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 500;
+      letter-spacing: .04em;
+      padding: 8px 20px; border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background .18s, border-color .18s;
+    }
+    .see-more-btn:hover { background: var(--gold-faint); border-color: var(--gold); }
+
     /* ── Responsive ── */
     @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
     @media (max-width: 768px) {
@@ -436,21 +450,43 @@ function buildUrgent(issues, ts) {
 }
 
 function buildRooms(rooms, ts) {
-  const body = (!rooms || !rooms.length)
-    ? '<div class="empty">No rooms with 2+ issues in the last 30 days.</div>'
-    : `<div class="room-grid">${rooms.map(r => `
-        <div class="room-card">
-          <div class="room-hdr">
-            <span class="room-num">Room ${r.room}</span>
-            <span class="room-cnt">${r.count}×</span>
-          </div>
-          <div class="room-last">Last: ${fmtDate(r.lastDate)}</div>
-          <div class="chips">
-            ${r.issueTypes.slice(0,4).map(c => `<span class="chip">${c}</span>`).join('')}
-            ${r.issueTypes.length > 4 ? `<span class="chip chip-dim">+${r.issueTypes.length - 4}</span>` : ''}
-          </div>
-        </div>`).join('')}</div>`;
+  if (!rooms || !rooms.length) {
+    return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, '<div class="empty">No rooms with 2+ facility issues in the last 30 days.</div>');
+  }
+  const VISIBLE = 9;
+  const hasMore = rooms.length > VISIBLE;
+  const renderCard = r => `
+    <div class="room-card">
+      <div class="room-hdr">
+        <span class="room-num">Room ${r.room}</span>
+        <span class="room-cnt">${r.count}x</span>
+      </div>
+      <div class="room-last">Last: ${fmtDate(r.lastDate)}</div>
+      <div class="chips">
+        ${r.issueTypes.slice(0,4).map(c => `<span class="chip">${c}</span>`).join('')}
+        ${r.issueTypes.length > 4 ? `<span class="chip chip-dim">+${r.issueTypes.length - 4}</span>` : ''}
+      </div>
+    </div>`;
+  const body = `
+    <div class="room-grid">${rooms.slice(0, VISIBLE).map(renderCard).join('')}</div>
+    ${hasMore ? `
+      <div class="room-grid" id="room-grid-extra" style="display:none;margin-top:10px">
+        ${rooms.slice(VISIBLE).map(renderCard).join('')}
+      </div>
+      <div style="text-align:center;margin-top:16px">
+        <button class="see-more-btn" id="room-toggle-btn" onclick="toggleRooms(${rooms.length - VISIBLE})">
+          See ${rooms.length - VISIBLE} more rooms
+        </button>
+      </div>` : ''}`;
   return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, body);
+}
+
+function toggleRooms(extra) {
+  const grid = document.getElementById('room-grid-extra');
+  const btn  = document.getElementById('room-toggle-btn');
+  const open = grid.style.display !== 'none';
+  grid.style.display = open ? 'none' : 'grid';
+  btn.textContent    = open ? 'See ' + extra + ' more rooms' : 'Show fewer';
 }
 
 function buildPublicSpaces(spaces, ts) {
