@@ -471,6 +471,22 @@ var FNB_DEPTS = new Set([
   "F&B - Peacock Lounge","F&B - Quill","F&B - Goldie's","F&B - Kappo Kappo"
 ]);
 
+// Categories that represent positive feedback or non-actionable entries —
+// excluded from urgent issues scoring and all drill-down breakdowns.
+var NON_ACTIONABLE_CATS = new Set([
+  "Guest Service Highlight","Guest Service Excellence","Guest Experience",
+  "Valet Service Excellence","Valet Service Positive",
+  "Staff Compliment","Staff Service",
+  "Positive Recognition","Dining Experience"
+]);
+function isNonActionable(cat) {
+  if (NON_ACTIONABLE_CATS.has(cat)) return true;
+  const t = cat.toLowerCase();
+  return t.includes('positive') || t.includes('excellence') ||
+         t.includes('highlight') || t.includes('compliment') ||
+         t.includes('promoter') || t.includes('recognition');
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 var trendChart = null;
 var allRecords = [];
@@ -587,10 +603,11 @@ function computeSections(records, startDate, endDate) {
   const now = new Date();
   const periodDays = (endDate - startDate) / 86400000 || 1;
 
-  // ── Urgent Issues (top 10, min 3 occurrences) ──
+  // ── Urgent Issues (top 10, min 3 occurrences, actionable only) ──
   const catMap = {};
   for (const r of filtered) {
     for (const cat of (r.cats || [])) {
+      if (isNonActionable(cat)) continue;
       if (!catMap[cat]) catMap[cat] = { count: 0, lastDate: null, depts: {} };
       catMap[cat].count++;
       if (!catMap[cat].lastDate || r.date > catMap[cat].lastDate) catMap[cat].lastDate = r.date;
@@ -599,7 +616,7 @@ function computeSections(records, startDate, endDate) {
   }
   const maxCount = Math.max(1, ...Object.values(catMap).map(v => v.count));
   const urgentIssues = Object.entries(catMap)
-    .filter(([, v]) => v.count >= 3)
+    .filter(([cat, v]) => v.count >= 3 && !isNonActionable(cat))
     .map(([cat, v]) => {
       const daysAgo = (now - new Date(v.lastDate + (v.lastDate.length === 10 ? 'T00:00:00Z' : ''))) / 86400000;
       const recency = Math.max(0, 1 - daysAgo / periodDays);
@@ -1005,6 +1022,7 @@ function drillUrgent(cat, rowEl) {
   }
 
   const topSubs = Object.entries(subMap)
+    .filter(([c, count]) => count >= 2 && !isNonActionable(c))
     .map(([c, count]) => ({ c, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
@@ -1088,6 +1106,7 @@ function drillDept(dept, rowEl) {
   }
 
   const topCats = Object.entries(catMap)
+    .filter(([cat]) => !isNonActionable(cat))
     .map(([cat, count]) => ({ cat, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
