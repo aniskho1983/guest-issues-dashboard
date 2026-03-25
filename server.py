@@ -24,6 +24,44 @@ PORT = int(os.environ.get("PORT", 3001))
 DATABASE_ID = "fe6160a3d0fd4c5e824af43c7338ba92"
 CACHE_TTL = 10 * 60  # seconds
 
+# Categories that represent physical/facility defects in a room.
+# Used to filter the "Recurrent Patterns by Room" section so it shows
+# infrastructure issues (broken phone, lighting, HVAC, plumbing, etc.)
+# rather than service quality issues.
+FACILITY_CATEGORIES = {
+    # Temperature & plumbing
+    "Hot Water/HVAC",
+    "HVAC/Temperature",
+    "Room Comfort",
+    "Shower Issues",
+    # In-room technology & devices
+    "Technology/TV",
+    "In-Room Tech Issues",
+    "In-Room Technology",
+    "Phone System Issues",
+    "Technology/Phone System Issues",
+    "Fitness Center Entertainment",
+    # Physical room condition
+    "Room Lighting",
+    "Room Comfort and Decor",
+    "Room Bedding",
+    "Room Amenities",
+    "Bathroom Amenities",
+    "Noise Issues",
+    "Cleanliness",
+    "Housekeeping Room Readiness",
+    "Room Doesn't Match Expectations",
+    # Pool & wellness facilities
+    "Pool Too Cold",
+    "Pool Too Small",
+    "Pool Size",
+    "Wellness Equipment Maintenance",
+    # Public areas
+    "Public Area Accessibility",
+    "Lobby Comfort",
+    "Lobby Experience",
+}
+
 FNB_DEPTS = {
     "F&B - Peacock",
     "F&B - La Piscina",
@@ -157,16 +195,21 @@ def compute_dashboard(raw_records):
     urgent.sort(key=lambda x: (-x["score"], -x["count"]))
     urgent = urgent[:10]
 
-    # ── 2. Room Patterns ────────────────────────────────────────────────────
+    # ── 2. Room Patterns (facility issues only) ─────────────────────────────
+    # Only count records that have at least one facility-related category.
+    # Strip non-facility categories from the display chips too.
     room_map = {}
     for r in last30:
         if not r["room"]:
             continue
+        facility_cats = [c for c in r["issueCategories"] if c in FACILITY_CATEGORIES]
+        if not facility_cats:
+            continue  # skip service-only issues entirely
         rm = r["room"]
         if rm not in room_map:
             room_map[rm] = {"count": 0, "cats": set(), "dates": []}
         room_map[rm]["count"] += 1
-        room_map[rm]["cats"].update(r["issueCategories"])
+        room_map[rm]["cats"].update(facility_cats)
         room_map[rm]["dates"].append(r["date"])
 
     room_patterns = []

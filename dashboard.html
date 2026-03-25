@@ -450,7 +450,7 @@ function buildRooms(rooms, ts) {
             ${r.issueTypes.length > 4 ? `<span class="chip chip-dim">+${r.issueTypes.length - 4}</span>` : ''}
           </div>
         </div>`).join('')}</div>`;
-  return card('Recurrent Patterns by Room', 'Rooms with 2 or more issues in the last 30 days', ts, body);
+  return card('Recurrent Patterns by Room', 'Facility issues only (HVAC, plumbing, tech, lighting, physical damage) · 2+ occurrences in last 30 days', ts, body);
 }
 
 function buildDepts(depts, ts) {
