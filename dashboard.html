@@ -192,20 +192,6 @@
       border-radius: var(--r-sm);
       animation: fadeIn .15s ease;
     }
-    .incident-row {
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .incident-row:last-child { border-bottom: none; }
-    .incident-title {
-      font-size: 12.5px; color: var(--text); line-height: 1.45;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .incident-meta {
-      font-size: 11px; color: var(--text-3); margin-top: 3px;
-    }
-    .incident-meta .imeta-dept { color: var(--gold); font-weight: 500; }
 
     .rank {
       width: 30px; height: 30px; border-radius: 50%;
@@ -997,35 +983,64 @@ function drillUrgent(cat, rowEl) {
   const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
   if (!startDate) return;
 
-  const incidents = allRecords
-    .filter(r => {
-      if (!(r.cats || []).includes(cat)) return false;
-      const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
-      return d >= startDate && d <= endDate;
-    })
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 20);
+  const matching = allRecords.filter(r => {
+    if (!(r.cats || []).includes(cat)) return false;
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    return d >= startDate && d <= endDate;
+  });
 
-  const rows = incidents.map(r => {
-    const meta = [
-      r.dept ? `<span class="imeta-dept">${r.dept}</span>` : null,
-      r.room ? `Room ${r.room}` : null,
-      fmtDate(r.date),
-    ].filter(Boolean).join(' \u00b7 ');
-    const title = r.title || '(no summary)';
-    return `
-      <div class="incident-row">
-        <div class="incident-title">${title}</div>
-        <div class="incident-meta">${meta}</div>
-      </div>`;
-  }).join('');
+  // Count co-occurring categories (excluding the clicked one itself)
+  const subMap = {};
+  for (const r of matching) {
+    for (const c of (r.cats || [])) {
+      if (c === cat) continue;
+      subMap[c] = (subMap[c] || 0) + 1;
+    }
+  }
+
+  // Also count by department
+  const deptMap = {};
+  for (const r of matching) {
+    if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
+  }
+
+  const topSubs = Object.entries(subMap)
+    .map(([c, count]) => ({ c, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const topDepts = Object.entries(deptMap)
+    .map(([dept, count]) => ({ dept, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const maxSub = topSubs.length ? topSubs[0].count : 1;
+  const maxDept = topDepts.length ? topDepts[0].count : 1;
+
+  const subRows = topSubs.map(({ c, count }) => `
+    <div class="drill-row">
+      <span class="drill-cat">${c}</span>
+      <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxSub*100).toFixed(1)}%"></div></div>
+      <span class="drill-cnt">${count}</span>
+    </div>`).join('');
+
+  const deptRows = topDepts.map(({ dept, count }) => `
+    <div class="drill-row">
+      <span class="drill-cat">${dept}</span>
+      <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxDept*100).toFixed(1)}%"></div></div>
+      <span class="drill-cnt">${count}</span>
+    </div>`).join('');
 
   panel.innerHTML = `
     <div class="drill-header">
-      <span>Individual Incidents</span>
-      <span class="drill-total">${incidents.length} shown${incidents.length === 20 ? ' (most recent 20)' : ''}</span>
+      <span>Co-occurring Issue Types</span>
+      <span class="drill-total">${matching.length} records total</span>
     </div>
-    ${rows || '<div class="empty" style="padding:12px">No incidents found.</div>'}`;
+    ${topSubs.length ? subRows : '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No co-occurring categories.</div>'}
+    ${topDepts.length ? `
+      <div class="drill-header" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <span>By Department</span>
+      </div>
+      ${deptRows}` : ''}`;
   panel.style.display = 'block';
 }
 
