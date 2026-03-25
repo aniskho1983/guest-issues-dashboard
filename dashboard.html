@@ -614,7 +614,16 @@ var SERVICE_DEPT_ORDER = [
   { label: 'Front Desk',     depts: ['Front Desk'] },
   { label: 'Housekeeping',   depts: ['Housekeeping'] },
   { label: 'Valet',          depts: ['Valet'] },
-  { label: 'Engineering',    depts: ['Engineering'] },
+  // Engineering: only show records where there was a SERVICE delivery failure.
+  // Physical/facility problems (HVAC, plumbing, shower, lights) belong in the
+  // Facility Issues card — not here.
+  { label: 'Engineering',    depts: ['Engineering'],
+    titleKeys: [
+      'waited','hours wait','never came','no response','slow to respond','no one came',
+      'not fixed','came back','still broken','same issue','returned','recurring',
+      'no follow','no update','not communicated','declined','refused',
+      'frustration','multiple calls','called again','repeat','unresolved',
+    ]},
   { label: 'Peacock',        depts: ['F&B - Peacock'] },
   { label: 'Peacock Lounge', depts: ['F&B - Peacock Lounge'] },
   { label: "Goldie's",       depts: ["F&B - Goldie's"] },
