@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Guest Issues Weekly Briefing — Austin Proper Hotel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    /* ── Tokens ── */
+    :root {
+      --bg:           #0b0b0f;
+      --bg-card:      #111118;
+      --bg-pill:      #1c1c28;
+      --gold:         #c49a3c;
+      --gold-light:   #ddb96a;
+      --gold-dim:     rgba(196,154,60,.18);
+      --gold-faint:   rgba(196,154,60,.07);
+      --gold-border:  rgba(196,154,60,.14);
+      --gold-line:    rgba(196,154,60,.22);
+      --text:         #ede9df;
+      --text-2:       #7a7264;
+      --text-3:       #4a4640;
+      --text-4:       #302e2a;
+      --border:       rgba(255,255,255,.055);
+      --border-card:  rgba(196,154,60,.09);
+      --r:            10px;
+      --r-sm:         6px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 400;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      position: sticky; top: 0; z-index: 100;
+      padding: 0 24px;
+      background: rgba(11,11,15,.94);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--gold-line);
+    }
+    .header-inner {
+      max-width: 1240px; margin: 0 auto;
+      display: flex; align-items: center;
+      justify-content: space-between;
+      gap: 24px; padding: 18px 0;
+    }
+    .hotel-eyebrow {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .22em; text-transform: uppercase;
+      color: var(--gold); display: block; margin-bottom: 4px;
+    }
+    .dashboard-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px; font-weight: 500;
+      color: var(--text); letter-spacing: -.02em; line-height: 1.2;
+    }
+    .dashboard-meta {
+      font-size: 12px; color: var(--text-2);
+      font-weight: 300; margin-top: 3px;
+    }
+    .dashboard-meta .sep { margin: 0 6px; opacity: .4; }
+
+    .refresh-btn {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; gap: 7px;
+      background: transparent;
+      border: 1px solid var(--gold-border);
+      color: var(--gold);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 500;
+      letter-spacing: .04em;
+      padding: 9px 18px; border-radius: var(--r-sm);
+      cursor: pointer; white-space: nowrap;
+      transition: background .18s, border-color .18s, opacity .18s;
+      text-decoration: none;
+    }
+    .refresh-btn:hover:not(:disabled) { background: var(--gold-faint); border-color: var(--gold); }
+    .refresh-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .refresh-icon { font-size: 15px; display: inline-block; }
+    .spinning { animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .static-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-3);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 8px 14px; white-space: nowrap;
+    }
+    .static-badge .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--gold); opacity: .7;
+    }
+
+    /* ── Main ── */
+    .app-main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 48px; }
+    .dashboard-grid { display: flex; flex-direction: column; gap: 20px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* ── Loading / Error ── */
+    .state-box {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; padding: 100px 24px;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    .state-text { font-size: 13px; color: var(--text-2); font-weight: 300; }
+    .state-err { font-size: 13px; color: #9c6060; }
+    .state-code { font-size: 11px; color: var(--text-3); font-family: monospace; margin-top: 6px; }
+
+    /* ── Section Card ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--r);
+      padding: 26px 28px;
+      position: relative; overflow: hidden;
+    }
+    .card::after {
+      content: '';
+      position: absolute; inset: 0 0 auto 0; height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--gold-border) 40%, var(--gold-border) 60%, transparent);
+      pointer-events: none;
+    }
+    .card-header {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 16px;
+      margin-bottom: 20px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px; font-weight: 500;
+      color: var(--text); letter-spacing: -.01em;
+    }
+    .card-sub { font-size: 11.5px; color: var(--text-2); margin-top: 4px; font-weight: 300; }
+    .card-ts { font-size: 10.5px; color: var(--text-3); white-space: nowrap; flex-shrink: 0; padding-top: 3px; }
+    .empty { text-align: center; padding: 36px; font-size: 13px; color: var(--text-3); font-style: italic; }
+
+    /* ── Urgent Issues ── */
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head {
+      display: grid;
+      grid-template-columns: 42px 1fr 100px 90px 1fr;
+      gap: 12px; padding: 6px 10px 10px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .tbl-row {
+      display: grid;
+      grid-template-columns: 42px 1fr 100px 90px 1fr;
+      gap: 12px; align-items: center;
+      padding: 13px 10px;
+      border-bottom: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      transition: background .14s;
+    }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--gold-faint); }
+
+    .rank {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--bg-pill); border: 1px solid var(--border);
+      color: var(--text-2); font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .rank-gold { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-light); }
+    .rank-silver { background: var(--gold-faint); border-color: var(--gold-border); color: var(--gold); }
+
+    .issue-name { font-size: 13.5px; color: var(--text); }
+    .pill {
+      display: inline-flex; align-items: center;
+      background: var(--gold-dim); color: var(--gold-light);
+      border-radius: 20px; padding: 3px 12px;
+      font-size: 12px; font-weight: 700;
+      font-variant-numeric: tabular-nums; min-width: 36px;
+    }
+    .issue-date { font-size: 12px; color: var(--text-2); }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag {
+      background: rgba(255,255,255,.04); color: var(--text-2);
+      font-size: 10.5px; padding: 2px 8px;
+      border-radius: 4px; border: 1px solid rgba(255,255,255,.07);
+      white-space: nowrap;
+    }
+    .tag-dim { color: var(--text-3); }
+
+    /* ── Room Cards ── */
+    .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px,1fr)); gap: 10px; }
+    .room-card {
+      background: var(--gold-faint); border: 1px solid var(--border-card);
+      border-radius: var(--r-sm); padding: 14px;
+      transition: border-color .18s, background .18s;
+    }
+    .room-card:hover { border-color: var(--gold-border); background: var(--gold-dim); }
+    .room-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .room-num { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--text); }
+    .room-cnt {
+      font-size: 11px; font-weight: 700; color: var(--gold);
+      background: var(--gold-dim); padding: 2px 8px; border-radius: 10px;
+    }
+    .room-last { font-size: 10.5px; color: var(--text-3); margin-bottom: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; }
+    .chip {
+      font-size: 10px; padding: 2px 6px; border-radius: 3px;
+      background: rgba(255,255,255,.05); color: var(--text-2);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .chip-dim { color: var(--text-3); }
+
+    /* ── Dept Bar List ── */
+    .bar-list { display: flex; flex-direction: column; gap: 9px; }
+    .bar-row { display: grid; grid-template-columns: 185px 1fr 38px; align-items: center; gap: 12px; }
+    .bar-label { font-size: 13px; color: var(--text); }
+    .bar-track { height: 5px; background: rgba(255,255,255,.05); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius: 3px; }
+    .bar-num { font-size: 13px; font-weight: 600; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Venue Cards ── */
+    .venue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; }
+    .venue-card {
+      text-align: center;
+      background: var(--gold-faint); border: 1px solid var(--border-card);
+      border-radius: var(--r-sm); padding: 20px 12px;
+      transition: border-color .18s;
+    }
+    .venue-card:hover { border-color: var(--gold-border); }
+    .venue-name { font-family: 'Playfair Display', serif; font-size: 13px; color: var(--text); margin-bottom: 10px; line-height: 1.3; }
+    .venue-num { font-size: 38px; font-weight: 300; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
+    .venue-lbl { font-size: 10.5px; color: var(--text-3); margin-top: 4px; }
+
+    /* ── YTD ── */
+    .ytd-hero { display: flex; align-items: baseline; gap: 14px; margin-bottom: 26px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .ytd-big { font-family: 'Playfair Display', serif; font-size: 64px; font-weight: 400; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
+    .ytd-lbl { font-size: 13px; color: var(--text-2); font-weight: 300; }
+    .chart-wrap { margin-bottom: 26px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .chart-heading { font-family: 'Playfair Display', serif; font-size: 13px; color: var(--text-2); font-weight: 400; margin-bottom: 14px; }
+    .chart-canvas { width: 100% !important; height: 190px !important; }
+    .ytd-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    .ytd-col-title { font-family: 'Playfair Display', serif; font-size: 13px; color: var(--text-2); font-weight: 400; margin-bottom: 10px; }
+    .ytd-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 12.5px; color: var(--text); border-bottom: 1px solid var(--border); }
+    .ytd-row:last-child { border-bottom: none; }
+    .ytd-cnt { font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+    /* ── Footer ── */
+    .app-footer { border-top: 1px solid var(--border); padding: 18px 24px; text-align: center; }
+    .app-footer p { font-size: 10.5px; color: var(--text-4); letter-spacing: .1em; text-transform: uppercase; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) {
+      .app-header { padding: 0 16px; position: relative; }
+      .header-inner { flex-direction: column; align-items: flex-start; padding: 16px 0; gap: 14px; }
+      .dashboard-title { font-size: 22px; }
+      .app-main { padding: 20px 16px 40px; }
+      .card { padding: 20px 18px; }
+      .tbl-head { display: none; }
+      .tbl-row { grid-template-columns: 36px 1fr; grid-template-rows: auto auto auto; gap: 6px 10px; padding: 14px 8px; }
+      .tbl-row > *:nth-child(3),
+      .tbl-row > *:nth-child(4),
+      .tbl-row > *:nth-child(5) { grid-column: 2; }
+      .tags { display: none; }
+      .bar-row { grid-template-columns: 130px 1fr 34px; }
+      .ytd-big { font-size: 48px; }
+      .ytd-tables { grid-template-columns: 1fr; gap: 20px; }
+    }
+    @media (max-width: 480px) {
+      .room-grid { grid-template-columns: 1fr 1fr; }
+      .venue-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+
+  <script>window.DASHBOARD_DATA={"urgentIssues":[{"category":"Other","count":32,"lastOccurrence":"2026-03-20","departments":["Engineering","Front Desk","Housekeeping","Other","Spa"],"score":0.915},{"category":"Front Desk Service","count":26,"lastOccurrence":"2026-03-20","departments":["F&B - La Piscina","Front Desk","Other","Valet"],"score":0.806},{"category":"Amenities","count":25,"lastOccurrence":"2026-03-20","departments":["Engineering","Front Desk","Housekeeping","Other","Valet"],"score":0.788},{"category":"Room Comfort","count":33,"lastOccurrence":"2026-03-08","departments":["Engineering","Front Desk","Housekeeping","Other"],"score":0.773},{"category":"Room Lighting","count":21,"lastOccurrence":"2026-03-24T07:31:00.000-05:00","departments":["Engineering","Front Desk","Other"],"score":0.768},{"category":"In-Room Technology","count":19,"lastOccurrence":"2026-03-24T09:07:00.000-05:00","departments":["Engineering","Front Desk","IT/Systems"],"score":0.732},{"category":"Hot Water/HVAC","count":29,"lastOccurrence":"2026-03-08","departments":["Engineering","Other"],"score":0.7},{"category":"Valet Service Failures","count":19,"lastOccurrence":"2026-03-20T09:56:00.000-05:00","departments":["Front Desk","Valet"],"score":0.679},{"category":"Engineering Service","count":17,"lastOccurrence":"2026-03-20","departments":["Engineering"],"score":0.642},{"category":"Room Doesn't Match Expectations","count":14,"lastOccurrence":"2026-03-23T16:10:00.000-05:00","departments":["Front Desk","Housekeeping"],"score":0.628}],"roomPatterns":[{"room":"612","count":18,"issueTypes":["AMEX/FHR Policy Friction","Guest Service Excellence","Guest Service Highlights","Pre-arrival Communication","Room Doesn't Match Expectations","Wellness & Amenities"],"lastDate":"2026-03-08T12:24:00.000+00:00"},{"room":"830","count":17,"issueTypes":["Guest Service","Menu Variety","Wellness & Amenities"],"lastDate":"2026-03-05"},{"room":"610","count":14,"issueTypes":["Bathroom Amenities","Dining Service","F&B Service","Front Desk Service","Hot Water/HVAC","In-Room Technology","Peacock Service","Pool Service","Pre-arrival Experience","Room Comfort","Technology/TV"],"lastDate":"2026-03-07T18:27:00.000+00:00"},{"room":"607","count":14,"issueTypes":["Bathroom Amenities","Dining Presentation","Gift Bag/Delivery Errors","Room Lighting","Valet Service","Valet Service Failures"],"lastDate":"2026-03-06"},{"room":"1105","count":12,"issueTypes":["AMEX/FHR Policy Friction","Bathroom Amenities","Room Doesn't Match Expectations","Room Lighting","Shower Issues"],"lastDate":"2026-03-23T11:35:00.000-05:00"},{"room":"625","count":12,"issueTypes":["Billing","Billing Errors","Front Desk Service Failures","Gift Bag/Delivery Errors","Guest Behavior Escalations","Guest Billing Issues","Guest Priority","Guest Priority Access","Guest Priority/Service","Housekeeping Room Readiness","Housekeeping Service","Other","Quill Service","Reservation Priority","Room Comfort","Room Lighting","Staff Interaction"],"lastDate":"2026-03-12T09:23:00.000-05:00"},{"room":"819","count":11,"issueTypes":["Pool Chair Availability","Valet Service Excellence","Valet Service Positive","Valet/Parking"],"lastDate":"2026-03-23T14:42:00.000-05:00"},{"room":"924","count":11,"issueTypes":["Dining Service","Dining Service Issues","IRD Service","Pool","Pool Size","Pool Too Small","Room Lighting","Staff Service","Valet Service","Valet Service Excellence","Wellness & Amenities"],"lastDate":"2026-03-20"},{"room":"626","count":10,"issueTypes":["Peacock Service","Restaurant Service","Restaurant Service Issues","Room Upgrade Policy","Staff Compliment"],"lastDate":"2026-03-10T09:54:00.000-05:00"},{"room":"712","count":10,"issueTypes":["AMEX/FHR Policy Friction","Dining Service Issues","Dining Service Speed","Front Desk Service","Guest Behavior Escalations","Phone System Failures","Phone System Issues","Piscina Service","Technology/Phone System Issues","Technology/TV","Valet Service Failures","Valet/Parking"],"lastDate":"2026-03-02"},{"room":"1115","count":9,"issueTypes":["Dining Experience","Engineering Service","General Satisfaction","Guest Service Highlight","Housekeeping Room Readiness","Pool","Pre-arrival Experience","Room Comfort","Room Upgrade"],"lastDate":"2026-03-23T13:46:00.000-05:00"},{"room":"420","count":9,"issueTypes":["Bar Service","Bathroom Amenities","Front Desk Service","Lobby Experience","Room Comfort and Decor","Staff Friendliness","Wellness & Amenities"],"lastDate":"2026-03-09T08:05:00.000-05:00"},{"room":"711","count":9,"issueTypes":["Cleanliness","Guest Service","Housekeeping Service","In-Room Technology","Valet Service Failures","Wellness & Amenities Policy"],"lastDate":"2026-03-08"},{"room":"817","count":9,"issueTypes":["Room Comfort","Valet/Parking"],"lastDate":"2026-03-08"},{"room":"1118","count":8,"issueTypes":["Engineering Service","HVAC/Temperature","Hot Water/HVAC","Room Comfort"],"lastDate":"2026-03-23T12:15:00.000-05:00"},{"room":"1116","count":8,"issueTypes":["Guest Behavior Escalations","In-Room Technology","Menu Variety","Pool Too Cold","Valet Service Failures"],"lastDate":"2026-03-21T08:30:00.000-05:00"},{"room":"723","count":8,"issueTypes":["Hot Water/HVAC","Valet Service Excellence"],"lastDate":"2026-03-08"},{"room":"904","count":8,"issueTypes":["AMEX/FHR Policy Friction","Amenities","F&B Service","Front Desk Service","Guest Communication Failures","Other","Room Comfort","Room Placement Failures","Technology/TV"],"lastDate":"2026-03-08"},{"room":"303","count":8,"issueTypes":["Amenities","Communication Issues","Front Desk Communication Failures","Front Desk Service","Guest Communication Failures","Guest Communication Issues","Guest Experience Pricing","Guest Service Communication","Guest Service Failures","Pricing Complaints","Pricing Concerns","Pricing/Value Concerns","Service Delivery Failures","Service Delivery Issues","Staff Service Failures","Valet Service Failures"],"lastDate":"2026-03-02"},{"room":"1028","count":7,"issueTypes":["Guest Behavior Escalations","HVAC/Temperature","Hot Water/HVAC","Housekeeping Service","In-Room Technology","Wellness & Amenities"],"lastDate":"2026-03-20"},{"room":"515","count":7,"issueTypes":["Billing","Front Desk Service","Other","Spa","Staff Service","Wellness Equipment Maintenance"],"lastDate":"2026-03-08T12:09:00.000+00:00"},{"room":"801","count":7,"issueTypes":["In-Room Technology","Menu Variety","Room Comfort","Room Doesn't Match Expectations","Room Lighting"],"lastDate":"2026-03-06"},{"room":"504","count":7,"issueTypes":["Front Desk Service","Guest Experience","Guest Service","Housekeeping Room Readiness","Room Comfort"],"lastDate":"2026-03-05"},{"room":"511","count":7,"issueTypes":[],"lastDate":"2026-03-02"},{"room":"614","count":6,"issueTypes":["Housekeeping Room Readiness","In-Room Technology","Other","Pool Access Priority"],"lastDate":"2026-03-24T09:07:00.000-05:00"},{"room":"523","count":6,"issueTypes":["Amenities","Bathroom Amenities","Dining Noise","Guest Communication Failures","Guest Service","Housekeeping Service","Noise Issues","Public Area Accessibility","Room Doesn't Match Expectations","Room Placement Failures","Shower Issues"],"lastDate":"2026-03-23T10:19:00.000-05:00"},{"room":"323","count":6,"issueTypes":["Engineering Service","Food Safety Issues","Front Desk Service Failures","HVAC/Temperature","Pool Access Restrictions","Pool Service Failures","Room Usage Restrictions"],"lastDate":"2026-03-11T08:12:00.000-05:00"},{"room":"620","count":6,"issueTypes":["Dining Service","Lobby Comfort","Pre-arrival Communication","Room Amenities","Room Bedding","Valet Service Failures"],"lastDate":"2026-03-11T07:28:00.000-05:00"},{"room":"918","count":6,"issueTypes":["In-Room Technology","Pricing","Pricing Concerns"],"lastDate":"2026-03-05"},{"room":"427","count":6,"issueTypes":["Dining Service Delay","Dining Service Delays","Fitness Center Entertainment","Wellness & Amenities Variety"],"lastDate":"2026-03-05"},{"room":"518","count":5,"issueTypes":["Guest Behavior Escalations","Menu Variety","Other","Pool Too Cold"],"lastDate":"2026-03-22T17:25:00.000-05:00"},{"room":"316","count":5,"issueTypes":["Menu Variety","Room Comfort","Room Lighting","Wellness & Amenities"],"lastDate":"2026-03-19T20:13:00.000-05:00"},{"room":"916","count":5,"issueTypes":["Room Comfort","Room Doesn't Match Expectations","Room Lighting","Shower Issues"],"lastDate":"2026-03-13T11:08:00.000-05:00"},{"room":"825","count":5,"issueTypes":["Dining Service","Guest Service","In-Room Technology","Room Lighting"],"lastDate":"2026-03-12T15:00:00.000-05:00"},{"room":"909","count":5,"issueTypes":["F&B Service","Room Comfort"],"lastDate":"2026-03-11T15:44:00.000-05:00"},{"room":"628","count":5,"issueTypes":["In-Room Technology","Shower Issues"],"lastDate":"2026-03-11T07:38:00.000-05:00"},{"room":"1117","count":5,"issueTypes":["Amenities","Hot Water/HVAC","Other","Room Comfort"],"lastDate":"2026-02-27"},{"room":"727","count":4,"issueTypes":["Guest Service Highlight","Housekeeping Room Readiness","Room Doesn't Match Expectations"],"lastDate":"2026-03-23T16:10:00.000-05:00"},{"room":"520","count":4,"issueTypes":["Housekeeping Service","Room Comfort","Service Delivery Issues"],"lastDate":"2026-03-21T08:02:00.000-05:00"},{"room":"425","count":4,"issueTypes":["Amenities","Engineering Service","In-Room Technology","Menu Variety","Room Placement Failures"],"lastDate":"2026-03-19T20:19:00.000-05:00"},{"room":"1108","count":4,"issueTypes":["Engineering Service","Hot Water/HVAC","In-Room Tech Issues","Room Comfort"],"lastDate":"2026-03-20"},{"room":"501","count":4,"issueTypes":["Menu Variety"],"lastDate":"2026-03-12T13:37:00.000-05:00"},{"room":"823","count":4,"issueTypes":["Room Comfort"],"lastDate":"2026-03-08"},{"room":"505","count":4,"issueTypes":["HVAC/Temperature","Menu Variety"],"lastDate":"2026-03-06"},{"room":"827","count":4,"issueTypes":["Guest Amenities","Guest Service Highlight","Staff Service"],"lastDate":"2026-03-06"},{"room":"615","count":4,"issueTypes":[],"lastDate":"2026-03-05"},{"room":"517","count":4,"issueTypes":["Engineering Service","Hot Water/HVAC","Housekeeping Service","Peacock Service"],"lastDate":"2026-02-27"},{"room":"409","count":4,"issueTypes":["Front Desk Service","Housekeeping Service","Other","Peacock Service","Room Comfort","Technology/TV"],"lastDate":"2026-02-27"},{"room":"403","count":3,"issueTypes":["Dining Service","Other","Room Comfort"],"lastDate":"2026-03-24T12:04:00.000-05:00"},{"room":"703","count":3,"issueTypes":["Pool Seating Process","Room Lighting","Staff Service"],"lastDate":"2026-03-24T07:31:00.000-05:00"},{"room":"714","count":3,"issueTypes":["F&B Service","Guest Experience Pricing","Other","Piscina Service","Service Delivery Issues","Valet/Parking"],"lastDate":"2026-03-23T10:22:00.000-05:00"},{"room":"1121","count":3,"issueTypes":["Amenities","Dining Service Delay","Engineering Service","IRD Service","Other"],"lastDate":"2026-03-20"},{"room":"315","count":3,"issueTypes":["Room Comfort","Wellness & Amenities"],"lastDate":"2026-03-18T07:14:00.000-05:00"},{"room":"708","count":3,"issueTypes":["In-Room Technology","Menu Variety"],"lastDate":"2026-03-14T16:50:00.000-05:00"},{"room":"1011","count":3,"issueTypes":["Wellness & Amenities"],"lastDate":"2026-03-11T09:34:00.000-05:00"},{"room":"709","count":3,"issueTypes":["Room Lighting"],"lastDate":"2026-03-11T07:46:00.000-05:00"},{"room":"914","count":3,"issueTypes":["Dining Experience","Guest Service"],"lastDate":"2026-03-11T07:05:00.000-05:00"},{"room":"514","count":3,"issueTypes":["IRD Service","Room Comfort"],"lastDate":"2026-03-08T17:27:00.000+00:00"},{"room":"601","count":3,"issueTypes":["Front Desk Service","Housekeeping Service","Service Delivery Issues","Valet/Parking"],"lastDate":"2026-03-08"},{"room":"704","count":3,"issueTypes":["Amenities","Front Desk Service","Hot Water/HVAC","Other"],"lastDate":"2026-03-08"},{"room":"414","count":3,"issueTypes":["HVAC/Temperature","Hot Water/HVAC"],"lastDate":"2026-03-06"},{"room":"1119","count":3,"issueTypes":["Housekeeping Service","Technology/TV"],"lastDate":"2026-02-27"},{"room":"1101","count":3,"issueTypes":["Goldie's Service","Other"],"lastDate":"2026-02-26"},{"room":"322","count":3,"issueTypes":["Amenities","Other"],"lastDate":"2026-02-25"},{"room":"1120","count":3,"issueTypes":["Housekeeping Service","Other"],"lastDate":"2026-02-24"},{"room":"1014","count":2,"issueTypes":["Food & Beverage Service","Guest Experience"],"lastDate":"2026-03-22T07:29:00.000-05:00"},{"room":"821","count":2,"issueTypes":["HVAC/Temperature"],"lastDate":"2026-03-20T10:55:00.000-05:00"},{"room":"423","count":2,"issueTypes":["Amenities","Front Desk Service","Hot Water/HVAC"],"lastDate":"2026-03-20"},{"room":"1019","count":2,"issueTypes":["HVAC/Temperature","Service Delivery Failures"],"lastDate":"2026-03-16T07:04:00.000-05:00"},{"room":"1023","count":2,"issueTypes":[],"lastDate":"2026-03-14T10:06:00.000-05:00"},{"room":"623","count":2,"issueTypes":["Other"],"lastDate":"2026-03-12T08:27:00.000-05:00"},{"room":"407","count":2,"issueTypes":["Guest Communication Failures","HVAC/Temperature","Housekeeping Service","Room Placement Failures","Service Delivery Issues"],"lastDate":"2026-03-08"},{"room":"917","count":2,"issueTypes":["In-Room Tech Issues","Other","Technology/TV"],"lastDate":"2026-03-08"},{"room":"302","count":2,"issueTypes":["Noise Issues","Other","Room Comfort"],"lastDate":"2026-03-08"},{"room":"706","count":2,"issueTypes":["Dining Service Issues","F&B Service","Noise Issues","Room Doesn't Match Expectations"],"lastDate":"2026-03-08"},{"room":"627","count":2,"issueTypes":["Front Desk Service","Guest Behavior Escalations"],"lastDate":"2026-03-08"},{"room":"1005","count":2,"issueTypes":["Amenities","Engineering Service","Hot Water/HVAC"],"lastDate":"2026-03-08"},{"room":"630","count":2,"issueTypes":["Other","Room Comfort","Room Doesn't Match Expectations"],"lastDate":"2026-03-08"},{"room":"720","count":2,"issueTypes":["Amenities","Engineering Service"],"lastDate":"2026-03-08"},{"room":"725","count":2,"issueTypes":["Guest Service Highlight"],"lastDate":"2026-03-06"},{"room":"321","count":2,"issueTypes":[],"lastDate":"2026-03-06"},{"room":"1024","count":2,"issueTypes":["Billing","Room Comfort"],"lastDate":"2026-03-01"},{"room":"719","count":2,"issueTypes":["Hot Water/HVAC","Room Comfort"],"lastDate":"2026-02-27"},{"room":"1123","count":2,"issueTypes":["Hot Water/HVAC","Pool"],"lastDate":"2026-02-27"},{"room":"508","count":2,"issueTypes":["Amenities","Valet/Parking"],"lastDate":"2026-02-27"},{"room":"406","count":2,"issueTypes":["Engineering Service","Valet/Parking"],"lastDate":"2026-02-27"},{"room":"1003","count":2,"issueTypes":["Hot Water/HVAC","Other"],"lastDate":"2026-02-27"}],"deptPatterns":[{"dept":"Engineering","count":59},{"dept":"Other","count":53},{"dept":"Front Desk","count":35},{"dept":"Housekeeping","count":21},{"dept":"Valet","count":11},{"dept":"F&B - Peacock","count":10},{"dept":"F&B - IRD","count":8},{"dept":"IT/Systems","count":6},{"dept":"Spa","count":5},{"dept":"F&B - La Piscina","count":4},{"dept":"F&B - Quill","count":2},{"dept":"F&B - Goldie's","count":2},{"dept":"Pool","count":2},{"dept":"F&B - Kappo Kappo","count":1}],"venuePatterns":[{"dept":"F&B - Peacock","count":10},{"dept":"F&B - IRD","count":8},{"dept":"F&B - La Piscina","count":4},{"dept":"F&B - Quill","count":2},{"dept":"F&B - Goldie's","count":2},{"dept":"F&B - Kappo Kappo","count":1}],"ytd":{"total":1200,"byDepartment":[{"dept":"Engineering","count":249},{"dept":"Front Desk","count":200},{"dept":"Other","count":146},{"dept":"Housekeeping","count":88},{"dept":"F&B - Peacock","count":48},{"dept":"F&B - IRD","count":40},{"dept":"Valet","count":39},{"dept":"IT/Systems","count":29},{"dept":"Spa","count":21},{"dept":"F&B - La Piscina","count":9},{"dept":"F&B - Goldie's","count":7},{"dept":"Pool","count":6},{"dept":"F&B - Peacock Lounge","count":3},{"dept":"F&B - Quill","count":2},{"dept":"Revenue","count":2},{"dept":"F&B - Kappo Kappo","count":1}],"byVenue":[{"dept":"F&B - Peacock","count":48},{"dept":"F&B - IRD","count":40},{"dept":"F&B - La Piscina","count":9},{"dept":"F&B - Goldie's","count":7},{"dept":"F&B - Peacock Lounge","count":3},{"dept":"F&B - Quill","count":2},{"dept":"F&B - Kappo Kappo","count":1}],"monthlyTrend":[{"month":"Jan '26","count":432},{"month":"Feb '26","count":363},{"month":"Mar '26","count":405}]},"lastUpdated":"2026-03-25T00:28:05Z","totalRecords":1202,"last30Count":524,"ytdCount":1200};</script>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <div class="header-inner">
+    <div>
+      <span class="hotel-eyebrow">Austin Proper Hotel</span>
+      <h1 class="dashboard-title">Guest Issues Weekly Briefing</h1>
+      <p class="dashboard-meta" id="meta">Live · Notion Guest Issues Task Tracker</p>
+    </div>
+    <div id="headerAction"></div>
+  </div>
+</header>
+
+<!-- ── Main ──────────────────────────────────────────────────────────────── -->
+<main class="app-main">
+  <div id="state-area"></div>
+  <div id="dashboard" style="display:none" class="dashboard-grid"></div>
+</main>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer class="app-footer">
+  <p>Austin Proper Hotel &nbsp;·&nbsp; Guest Experience Intelligence &nbsp;·&nbsp; Internal Use Only</p>
+</footer>
+
+<script>
+// ── Mode detection ─────────────────────────────────────────────────────────
+// If window.DASHBOARD_DATA exists, we're running as a static GitHub Pages site.
+// Otherwise we're running locally against the Python API server.
+const STATIC_MODE = !!window.DASHBOARD_DATA;
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+let trendChart = null;
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s + (s.length === 10 ? 'T00:00:00Z' : ''));
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone:'UTC' });
+}
+
+function fmtTs(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-US', {
+    weekday:'short', month:'short', day:'numeric',
+    hour:'numeric', minute:'2-digit', hour12:true
+  });
+}
+
+function daysAgoLabel(s) {
+  if (!s) return '—';
+  const diff = (Date.now() - new Date(s + (s.length === 10 ? 'T00:00:00Z' : '')).getTime()) / 86400000;
+  if (diff < 1) return 'Today';
+  if (diff < 2) return 'Yesterday';
+  return `${Math.round(diff)}d ago`;
+}
+
+function stripFnb(s) { return s.replace(/^F&B\s*[-–]\s*/i, ''); }
+
+function h(tag, cls, content, attrs = '') {
+  return `<${tag} class="${cls}" ${attrs}>${content}</${tag}>`;
+}
+
+function setRefreshing(on) {
+  if (STATIC_MODE) return;
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  const lbl = document.getElementById('refreshLabel');
+  if (!btn) return;
+  btn.disabled = on;
+  icon.className = on ? 'refresh-icon spinning' : 'refresh-icon';
+  lbl.textContent = on ? 'Refreshing…' : 'Refresh Data';
+}
+
+function initHeaderAction() {
+  const el = document.getElementById('headerAction');
+  if (!el) return;
+  if (STATIC_MODE) {
+    // Static mode: show "auto-refreshes weekly" badge
+    el.innerHTML = `<span class="static-badge"><span class="dot"></span>Auto-refreshes every Monday</span>`;
+  } else {
+    // Local mode: show the refresh button
+    el.innerHTML = `
+      <button class="refresh-btn" id="refreshBtn" onclick="loadDashboard(true)">
+        <span class="refresh-icon" id="refreshIcon">↻</span>
+        <span id="refreshLabel">Refresh Data</span>
+      </button>`;
+  }
+}
+
+// ── Section builders ───────────────────────────────────────────────────────
+function card(title, sub, ts, body) {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">${title}</h2>
+          ${sub ? `<p class="card-sub">${sub}</p>` : ''}
+        </div>
+        ${ts ? `<span class="card-ts">Updated ${fmtTs(ts)}</span>` : ''}
+      </div>
+      ${body}
+    </div>`;
+}
+
+function buildUrgent(issues, ts) {
+  if (!issues || !issues.length) {
+    return card(
+      'Top Urgent Issues — Last 30 Days',
+      'Ranked by pattern frequency + recency · Minimum 3 occurrences to qualify',
+      ts,
+      '<div class="empty">No issue patterns meet the urgency threshold yet.</div>'
+    );
+  }
+
+  const rankClass = i => i === 0 ? 'rank rank-gold' : i <= 2 ? 'rank rank-silver' : 'rank';
+
+  const rows = issues.map((issue, i) => `
+    <div class="tbl-row">
+      <span class="${rankClass(i)}">${i + 1}</span>
+      <span class="issue-name">${issue.category}</span>
+      <span><span class="pill">${issue.count}</span></span>
+      <span class="issue-date">${daysAgoLabel(issue.lastOccurrence)}</span>
+      <span class="tags">
+        ${issue.departments.slice(0,3).map(d => `<span class="tag">${d}</span>`).join('')}
+        ${issue.departments.length > 3 ? `<span class="tag tag-dim">+${issue.departments.length - 3}</span>` : ''}
+      </span>
+    </div>`).join('');
+
+  const body = `
+    <div class="tbl">
+      <div class="tbl-head">
+        <span>#</span><span>Issue Category</span>
+        <span>Occurrences</span><span>Last Seen</span>
+        <span>Departments Affected</span>
+      </div>
+      ${rows}
+    </div>`;
+
+  return card(
+    'Top Urgent Issues — Last 30 Days',
+    'Ranked by pattern frequency + recency · Minimum 3 occurrences to qualify',
+    ts, body
+  );
+}
+
+function buildRooms(rooms, ts) {
+  const body = (!rooms || !rooms.length)
+    ? '<div class="empty">No rooms with 2+ issues in the last 30 days.</div>'
+    : `<div class="room-grid">${rooms.map(r => `
+        <div class="room-card">
+          <div class="room-hdr">
+            <span class="room-num">Room ${r.room}</span>
+            <span class="room-cnt">${r.count}×</span>
+          </div>
+          <div class="room-last">Last: ${fmtDate(r.lastDate)}</div>
+          <div class="chips">
+            ${r.issueTypes.slice(0,4).map(c => `<span class="chip">${c}</span>`).join('')}
+            ${r.issueTypes.length > 4 ? `<span class="chip chip-dim">+${r.issueTypes.length - 4}</span>` : ''}
+          </div>
+        </div>`).join('')}</div>`;
+  return card('Recurrent Patterns by Room', 'Rooms with 2 or more issues in the last 30 days', ts, body);
+}
+
+function buildDepts(depts, ts) {
+  if (!depts || !depts.length) {
+    return card('Recurrent Patterns by Department', 'Issue volume ranked by department — last 30 days', ts, '<div class="empty">No data for this period.</div>');
+  }
+  const max = Math.max(...depts.map(d => d.count), 1);
+  const rows = depts.map((d, i) => `
+    <div class="bar-row">
+      <span class="bar-label">${d.dept}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${(d.count/max*100).toFixed(1)}%;opacity:${Math.max(0.35,1-i*0.055).toFixed(2)}"></div>
+      </div>
+      <span class="bar-num">${d.count}</span>
+    </div>`).join('');
+  return card('Recurrent Patterns by Department', 'Issue volume ranked by department — last 30 days', ts, `<div class="bar-list">${rows}</div>`);
+}
+
+function buildVenues(venues, ts) {
+  const body = (!venues || !venues.length)
+    ? '<div class="empty">No F&B venue data for this period.</div>'
+    : `<div class="venue-grid">${venues.map(v => `
+        <div class="venue-card">
+          <div class="venue-name">${stripFnb(v.dept)}</div>
+          <div class="venue-num">${v.count}</div>
+          <div class="venue-lbl">issues</div>
+        </div>`).join('')}</div>`;
+  return card('Recurrent Patterns by Restaurant & Venue', 'F&B venues only — last 30 days', ts, body);
+}
+
+function buildYTD(ytd, ts) {
+  if (!ytd) return '';
+  const { total, byDepartment, byVenue, monthlyTrend } = ytd;
+
+  const deptRows = byDepartment.map(d => `
+    <div class="ytd-row"><span>${d.dept}</span><span class="ytd-cnt">${d.count}</span></div>`).join('');
+
+  const venueRows = byVenue.map(v => `
+    <div class="ytd-row"><span>${stripFnb(v.dept)}</span><span class="ytd-cnt">${v.count}</span></div>`).join('');
+
+  const body = `
+    <div class="ytd-hero">
+      <span class="ytd-big">${total}</span>
+      <span class="ytd-lbl">total issues logged year-to-date</span>
+    </div>
+    ${monthlyTrend && monthlyTrend.length ? `
+    <div class="chart-wrap">
+      <p class="chart-heading">Monthly Issue Volume</p>
+      <canvas id="trendChart" class="chart-canvas"></canvas>
+    </div>` : ''}
+    <div class="ytd-tables">
+      <div>
+        <p class="ytd-col-title">By Department</p>
+        ${deptRows}
+      </div>
+      ${byVenue.length ? `<div><p class="ytd-col-title">F&B Venues</p>${venueRows}</div>` : ''}
+    </div>`;
+
+  return card(`Year-to-Date Summary — ${new Date().getFullYear()}`,
+    'All issues logged · Broken down by department and venue with monthly trend', ts, body);
+}
+
+function drawChart(monthlyTrend) {
+  if (!monthlyTrend || !monthlyTrend.length) return;
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+
+  const gold = '#c49a3c';
+  const ctx = canvas.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, 0, 190);
+  grad.addColorStop(0, 'rgba(196,154,60,0.35)');
+  grad.addColorStop(1, 'rgba(196,154,60,0)');
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: monthlyTrend.map(m => m.month),
+      datasets: [{
+        data: monthlyTrend.map(m => m.count),
+        borderColor: gold,
+        borderWidth: 1.5,
+        backgroundColor: grad,
+        fill: true,
+        tension: 0.35,
+        pointBackgroundColor: gold,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#181820',
+          borderColor: 'rgba(196,154,60,0.2)',
+          borderWidth: 1,
+          titleColor: gold,
+          bodyColor: '#ede9df',
+          padding: 10,
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y} issues`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: { color: '#4a4640', font: { size: 11 } },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: { color: '#4a4640', font: { size: 11 }, precision: 0 },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderDashboard(data) {
+  const ts = data.lastUpdated;
+
+  // Header meta
+  document.getElementById('meta').innerHTML = `
+    Live · Notion Guest Issues Task Tracker
+    <span class="sep">·</span>${data.totalRecords} records
+    <span class="sep">·</span>${data.last30Count} last 30d
+    <span class="sep">·</span>${data.ytdCount} YTD`;
+
+  // Build sections
+  const urgent  = buildUrgent(data.urgentIssues, ts);
+  const rooms   = buildRooms(data.roomPatterns, ts);
+  const venues  = buildVenues(data.venuePatterns, ts);
+  const depts   = buildDepts(data.deptPatterns, ts);
+  const ytd     = buildYTD(data.ytd, ts);
+
+  const dash = document.getElementById('dashboard');
+  dash.innerHTML = `
+    ${urgent}
+    <div class="two-col">${rooms}${venues}</div>
+    ${depts}
+    ${ytd}
+  `;
+  dash.style.display = 'flex';
+
+  // Draw chart after DOM update
+  setTimeout(() => drawChart(data.ytd && data.ytd.monthlyTrend), 50);
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────
+async function loadDashboard(bust = false) {
+  // Static mode: data is already embedded — just render it
+  if (STATIC_MODE && !bust) {
+    renderDashboard(window.DASHBOARD_DATA);
+    return;
+  }
+
+  setRefreshing(true);
+  document.getElementById('state-area').innerHTML = '';
+
+  if (!bust) {
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('state-area').innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p class="state-text">Pulling live data from Notion…</p>
+      </div>`;
+  }
+
+  try {
+    const url = bust ? '/api/dashboard?refresh=true' : '/api/dashboard';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    document.getElementById('state-area').innerHTML = '';
+    renderDashboard(data);
+  } catch (e) {
+    document.getElementById('state-area').innerHTML = `
+      <div class="state-box">
+        <p class="state-err">⚠ Unable to load dashboard</p>
+        <p class="state-code">${e.message}</p>
+      </div>`;
+    if (bust) document.getElementById('dashboard').style.display = 'flex';
+  } finally {
+    setRefreshing(false);
+  }
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+initHeaderAction();
+loadDashboard();
+</script>
+</body>
+</html>
