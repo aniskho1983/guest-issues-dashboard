@@ -191,6 +191,26 @@
     .tbl-row.active { background: var(--gold-faint); }
     .tbl-row.active .bar-arrow { transform: rotate(180deg); }
 
+    /* ── Service Issues dept rows ── */
+    .svc-list { display: flex; flex-direction: column; }
+    .svc-row {
+      display: grid;
+      grid-template-columns: 160px 1fr 80px 80px 28px;
+      gap: 12px; align-items: center;
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      cursor: pointer; transition: background .14s;
+    }
+    .svc-row:last-of-type { border-bottom: none; }
+    .svc-row:hover, .svc-row.active { background: var(--gold-faint); }
+    .svc-row.active .bar-arrow { transform: rotate(180deg); }
+    .svc-label { font-size: 13.5px; font-weight: 500; color: var(--text); }
+    .svc-bar-wrap { background: var(--bg); border-radius: 3px; height: 7px; overflow: hidden; }
+    .svc-bar-fill { height: 100%; background: var(--gold); opacity: .7; border-radius: 3px; transition: width .3s; }
+    .svc-count { text-align: right; }
+    .svc-date { font-size: 12px; color: var(--text-3); }
+
     /* ── Urgent Drill-down (click → recent examples) ── */
     .urgent-drill {
       margin: 0 10px 8px 10px;
@@ -586,6 +606,32 @@ function catType(cat) {
   return 'service';
 }
 
+// ── Service department display order ─────────────────────────────────────
+// Each entry defines the label shown in the UI and how to match records to it.
+// depts: match by r.dept; catKeys/titleKeys: additional keyword filters for
+// amenity areas that don't have their own Notion department (Minibar, Gym).
+var SERVICE_DEPT_ORDER = [
+  { label: 'Front Desk',     depts: ['Front Desk'] },
+  { label: 'Housekeeping',   depts: ['Housekeeping'] },
+  { label: 'Valet',          depts: ['Valet'] },
+  { label: 'Engineering',    depts: ['Engineering'] },
+  { label: 'Peacock',        depts: ['F&B - Peacock'] },
+  { label: 'Peacock Lounge', depts: ['F&B - Peacock Lounge'] },
+  { label: "Goldie's",       depts: ["F&B - Goldie's"] },
+  { label: 'Kappo Kappo',    depts: ['F&B - Kappo Kappo'] },
+  { label: 'Quill',          depts: ['F&B - Quill'] },
+  { label: 'La Piscina',     depts: ['F&B - La Piscina'] },
+  { label: 'Pool',           depts: ['Pool'] },
+  { label: 'In Room Dining', depts: ['F&B - IRD'],
+    excludeTitleKeys: ['minibar','mini bar','mini-bar'] },
+  { label: 'Minibar',        depts: ['F&B - IRD','Housekeeping','Engineering'],
+    titleKeys: ['minibar','mini bar','mini-bar'] },
+  { label: 'Spa',            depts: ['Spa'] },
+  { label: 'Gym',            depts: ['Spa','Engineering'],
+    catKeys: ['Wellness Equipment Maintenance','Fitness Center Entertainment'],
+    titleKeys: ['fitness','gym','treadmill','elliptical','peloton','spin bike'] },
+];
+
 // ── Issue sub-classifiers (keyword → sub-category, built from real Notion data) ──
 var ISSUE_CLASSIFIERS = {
 
@@ -860,6 +906,25 @@ function getPeriodLabel(period, startDate, endDate) {
   return 'Custom Range';
 }
 
+// Shared helper — used in computeSections AND in drillServiceDept/showServiceTooltip
+function matchesDept(r, entry) {
+  const deptSet = new Set(entry.depts || []);
+  const titleL = (r.title || '').toLowerCase();
+  const cats = r.cats || [];
+  if (entry.catKeys) {
+    const catKeySet = new Set(entry.catKeys);
+    if (!cats.some(c => catKeySet.has(c))) {
+      if (!(entry.titleKeys && entry.titleKeys.some(k => titleL.includes(k)))) return false;
+    }
+  }
+  if (entry.titleKeys && !entry.titleKeys.some(k => titleL.includes(k))) {
+    if (entry.catKeys || !entry.depts) return false;
+    return false;
+  }
+  if (entry.excludeTitleKeys && entry.excludeTitleKeys.some(k => titleL.includes(k))) return false;
+  return deptSet.has(r.dept);
+}
+
 // ── Compute sections from raw records ─────────────────────────────────────
 function computeSections(records, startDate, endDate) {
   const filtered = records.filter(r => {
@@ -870,18 +935,23 @@ function computeSections(records, startDate, endDate) {
   const now = new Date();
   const periodDays = (endDate - startDate) / 86400000 || 1;
 
-  // ── Urgent Issues — split into service / facility / fnb ──
-  // Categories are normalized to merge synonyms (e.g. Hot Water/HVAC + HVAC/Temperature → HVAC & Hot Water)
-  const svcMap = {}, facMap = {}, fnbMap = {};
+  // ── Service Issues — organized by department in prescribed order ──
+  const serviceDepts = SERVICE_DEPT_ORDER.map(entry => {
+    const recs = filtered.filter(r => matchesDept(r, entry));
+    if (!recs.length) return null;
+    const lastDate = recs.reduce((best, r) => (!best || r.date > best ? r.date : best), null);
+    return { label: entry.label, count: recs.length, lastDate };
+  }).filter(Boolean);
+
+  // ── Facility Issues — top recurring physical/room categories ──
+  const facMap = {};
   for (const r of filtered) {
     for (const rawCat of (r.cats || [])) {
       const cat = normalizeCat(rawCat);
-      const type = catType(cat);
-      if (type === 'positive') continue;
-      const map = type === 'facility' ? facMap : type === 'fnb' ? fnbMap : svcMap;
-      if (!map[cat]) map[cat] = { count: 0, lastDate: null };
-      map[cat].count++;
-      if (!map[cat].lastDate || r.date > map[cat].lastDate) map[cat].lastDate = r.date;
+      if (catType(cat) !== 'facility') continue;
+      if (!facMap[cat]) facMap[cat] = { count: 0, lastDate: null };
+      facMap[cat].count++;
+      if (!facMap[cat].lastDate || r.date > facMap[cat].lastDate) facMap[cat].lastDate = r.date;
     }
   }
 
@@ -899,9 +969,7 @@ function computeSections(records, startDate, endDate) {
       .slice(0, limit);
   }
 
-  const serviceIssues  = rankCats(svcMap, 2, 8);
   const facilityIssues = rankCats(facMap, 2, 8);
-  const fnbIssues      = rankCats(fnbMap, 2, 8);
 
   // ── Room Patterns (facility only, 2+ occurrences) ──
   const roomMap = {};
@@ -947,7 +1015,7 @@ function computeSections(records, startDate, endDate) {
 
   const venuePatterns = deptPatterns.filter(d => FNB_DEPTS.has(d.dept));
 
-  return { serviceIssues, facilityIssues, fnbIssues, roomPatterns, publicSpacePatterns, deptPatterns, venuePatterns };
+  return { serviceDepts, facilityIssues, roomPatterns, publicSpacePatterns, deptPatterns, venuePatterns };
 }
 
 function computeYTD(records) {
@@ -994,52 +1062,65 @@ function card(title, sub, ts, body) {
     </div>`;
 }
 
-function buildUrgent(svcIssues, facIssues, fnbIssues, ts, pl) {
+function urgentDeptSafeId(label) {
+  return 'sdrill-' + label.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+}
+
+function buildServiceSection(depts, ts, pl) {
   pl = pl || 'Last 30 Days';
-
-  const rankClass = i => i === 0 ? 'rank rank-gold' : i <= 2 ? 'rank rank-silver' : 'rank';
-
-  function issueRows(issues) {
-    if (!issues.length) return '<div class="empty" style="padding:10px 0">No recurring patterns in this period.</div>';
-    return issues.map((issue, i) => {
-      const uid = urgentSafeId(issue.category);
-      const esc = issue.category.replace(/'/g, "\\'");
-      return `
-      <div class="tbl-row" onclick="drillUrgent('${esc}', this)" onmouseenter="showUrgentTooltip('${esc}', this)" onmouseleave="hideUrgentTooltip()">
-        <span class="${rankClass(i)}">${i + 1}</span>
-        <span class="issue-name">${issue.category}</span>
-        <span><span class="pill">${issue.count}</span></span>
-        <span class="issue-date">${daysAgoLabel(issue.lastOccurrence)}</span>
-        <span class="bar-arrow">&#9660;</span>
-      </div>
-      <div class="urgent-drill" id="${uid}" style="display:none"></div>`;
-    }).join('');
+  if (!depts || !depts.length) {
+    return card('Service Issues \u2014 ' + pl, 'By department \u00b7 Hover for issue breakdown \u00b7 Click for examples', ts,
+      '<div class="empty">No service issues recorded in this period.</div>');
   }
-
-  const tblHead = `<div class="tbl-head" style="grid-template-columns:36px 1fr 90px 80px 32px">
-    <span>#</span><span>Issue</span><span>Occurrences</span><span>Last Seen</span><span></span>
-  </div>`;
-
-  function section(label, issues, color) {
+  const maxCount = Math.max(...depts.map(d => d.count));
+  const rows = depts.map(d => {
+    const uid = urgentDeptSafeId(d.label);
+    const esc = d.label.replace(/'/g, "\\'");
+    const barW = (d.count / maxCount * 100).toFixed(1);
     return `
-    <div class="urgent-section">
-      <div class="urgent-section-hdr" style="--sc:${color}">${label}</div>
-      <div class="tbl" style="--tbl-cols:36px 1fr 90px 80px 32px">
-        ${tblHead}${issueRows(issues)}
-      </div>
-    </div>`;
+    <div class="svc-row" onclick="drillServiceDept('${esc}', this)" onmouseenter="showServiceTooltip('${esc}', this)" onmouseleave="hideUrgentTooltip()">
+      <span class="svc-label">${d.label}</span>
+      <div class="svc-bar-wrap"><div class="svc-bar-fill" style="width:${barW}%"></div></div>
+      <span class="svc-count"><span class="pill">${d.count}</span></span>
+      <span class="svc-date issue-date">${daysAgoLabel(d.lastDate)}</span>
+      <span class="bar-arrow">&#9660;</span>
+    </div>
+    <div class="urgent-drill" id="${uid}" style="display:none"></div>`;
+  }).join('');
+  return card('Service Issues \u2014 ' + pl,
+    'By department \u00b7 Hover for issue breakdown \u00b7 Click for recent examples',
+    ts,
+    `<div class="svc-list">${rows}</div>`);
+}
+
+function buildFacilitySection(issues, ts, pl) {
+  pl = pl || 'Last 30 Days';
+  if (!issues || !issues.length) {
+    return card('Room &amp; Facility Issues \u2014 ' + pl,
+      'Physical room &amp; infrastructure \u00b7 Hover for breakdown \u00b7 Click for examples', ts,
+      '<div class="empty">No recurring facility issues in this period.</div>');
   }
-
-  const body = `
-    ${section('Service Failures', svcIssues, 'var(--gold)')}
-    ${section('Room &amp; Facility Issues', facIssues, '#4a90d9')}
-    ${section('F&amp;B Issues', fnbIssues, '#7cb87c')}`;
-
-  return card(
-    `Top Issues by Category \u2014 ${pl}`,
-    'Ranked by frequency + recency \u00b7 Minimum 2 occurrences \u00b7 Click any row to see breakdown',
-    ts, body
-  );
+  const rankClass = i => i === 0 ? 'rank rank-gold' : i <= 2 ? 'rank rank-silver' : 'rank';
+  const rows = issues.map((issue, i) => {
+    const uid = urgentSafeId(issue.category);
+    const esc = issue.category.replace(/'/g, "\\'");
+    return `
+    <div class="tbl-row" onclick="drillUrgent('${esc}', this)" onmouseenter="showUrgentTooltip('${esc}', this)" onmouseleave="hideUrgentTooltip()">
+      <span class="${rankClass(i)}">${i + 1}</span>
+      <span class="issue-name">${issue.category}</span>
+      <span><span class="pill">${issue.count}</span></span>
+      <span class="issue-date">${daysAgoLabel(issue.lastOccurrence)}</span>
+      <span class="bar-arrow">&#9660;</span>
+    </div>
+    <div class="urgent-drill" id="${uid}" style="display:none"></div>`;
+  }).join('');
+  return card('Room &amp; Facility Issues \u2014 ' + pl,
+    'Physical room &amp; infrastructure \u00b7 Hover for breakdown \u00b7 Click for recent examples',
+    ts,
+    `<div class="tbl" style="--tbl-cols:36px 1fr 90px 80px 32px">
+      <div class="tbl-head"><span>#</span><span>Issue</span><span>Occurrences</span><span>Last Seen</span><span></span></div>
+      ${rows}
+    </div>`);
 }
 
 function buildRooms(rooms, ts, pl) {
@@ -1376,6 +1457,114 @@ function hideUrgentTooltip() {
   if (tt) tt.style.display = 'none';
 }
 
+// ── Service dept drill (click → recent examples) ───────────────────────────
+let activeServiceDept = null;
+
+function getServiceDeptEntry(label) {
+  return SERVICE_DEPT_ORDER.find(e => e.label === label);
+}
+
+function getServiceDeptRecords(label, startDate, endDate) {
+  const entry = getServiceDeptEntry(label);
+  if (!entry) return [];
+  return allRecords.filter(r => {
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    if (d < startDate || d > endDate) return false;
+    return matchesDept(r, entry);
+  });
+}
+
+function drillServiceDept(label, rowEl) {
+  const uid = urgentDeptSafeId(label);
+  const panel = document.getElementById(uid);
+  if (!panel) return;
+
+  if (activeServiceDept === label) {
+    panel.style.display = 'none';
+    rowEl.classList.remove('active');
+    activeServiceDept = null;
+    return;
+  }
+  if (activeServiceDept) {
+    const prev = document.getElementById(urgentDeptSafeId(activeServiceDept));
+    if (prev) prev.style.display = 'none';
+    document.querySelectorAll('.svc-row.active').forEach(r => r.classList.remove('active'));
+  }
+  activeServiceDept = label;
+  rowEl.classList.add('active');
+
+  const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
+  if (!startDate) return;
+  const matching = getServiceDeptRecords(label, startDate, endDate);
+
+  const recent = matching
+    .filter(r => r.title && r.title !== '(untitled)')
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 8);
+  const exampleRows = recent.map(r => {
+    const meta = [
+      r.room ? `Room ${r.room}` : null,
+      fmtDate(r.date)
+    ].filter(Boolean).join(' \u00b7 ');
+    return `<div class="incident-row"><div class="incident-title">${r.title}</div><div class="incident-meta">${meta}</div></div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="drill-header">
+      <span>Most Recent Incidents — ${label}</span>
+      <span class="drill-total">${matching.length} total</span>
+    </div>
+    ${exampleRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No titled records found.</div>'}`;
+  panel.style.display = 'block';
+}
+
+// ── Service dept hover tooltip (top issue categories) ──────────────────────
+function showServiceTooltip(label, rowEl) {
+  const tt = document.getElementById('issue-tooltip');
+  if (!tt || !allRecords.length) return;
+  const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
+  if (!startDate) return;
+  const matching = getServiceDeptRecords(label, startDate, endDate);
+
+  // Top non-positive categories for this dept
+  const catMap = {};
+  for (const r of matching) {
+    for (const rawCat of (r.cats || [])) {
+      const cat = normalizeCat(rawCat);
+      if (isNonActionable(cat)) continue;
+      catMap[cat] = (catMap[cat] || 0) + 1;
+    }
+  }
+  const topCats = Object.entries(catMap)
+    .map(([c, n]) => ({ c, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6);
+
+  let html = `<div class="tt-title">Top Issue Categories</div>`;
+  if (topCats.length) {
+    const maxN = topCats[0].n;
+    html += topCats.map(({ c, n }) => `
+      <div class="tt-row">
+        <span class="tt-label">${c}</span>
+        <div class="tt-bar-wrap"><div class="tt-bar-fill" style="width:${(n/maxN*100).toFixed(1)}%"></div></div>
+        <span class="tt-cnt">${n}</span>
+      </div>`).join('');
+  } else {
+    html += `<div class="tt-empty">${matching.length} records — no category data</div>`;
+  }
+  html += `<div class="tt-hint">&#9660; Click to see recent examples</div>`;
+  tt.innerHTML = html;
+
+  const rect = rowEl.getBoundingClientRect();
+  const ttW = 310;
+  let left = rect.right + 14;
+  if (left + ttW > window.innerWidth - 12) left = rect.left - ttW - 14;
+  const top = Math.min(Math.max(rect.top, 8), window.innerHeight - 300);
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+  tt.style.display = 'block';
+}
+
 // ── Department drill-down ──────────────────────────────────────────────────
 let activeDept = null;
 
@@ -1473,7 +1662,8 @@ function applyPeriod() {
   const ytd      = computeYTD(allRecords);
   const ts       = lastTs;
 
-  const urgent = buildUrgent(sections.serviceIssues, sections.facilityIssues, sections.fnbIssues, ts, pl);
+  const svc    = buildServiceSection(sections.serviceDepts, ts, pl);
+  const urgent = buildFacilitySection(sections.facilityIssues, ts, pl);
   const rooms  = buildRooms(sections.roomPatterns, ts, pl);
   const venues = buildVenues(sections.venuePatterns, ts, pl);
   const spaces = buildPublicSpaces(sections.publicSpacePatterns, ts, pl);
@@ -1481,7 +1671,7 @@ function applyPeriod() {
   const ytdHtml = buildYTD(ytd, ts);
 
   const dash = document.getElementById('dashboard');
-  dash.innerHTML = `${urgent}<div class="two-col">${rooms}${venues}</div>${spaces}${depts}${ytdHtml}`;
+  dash.innerHTML = `${svc}${urgent}<div class="two-col">${rooms}${venues}</div>${spaces}${depts}${ytdHtml}`;
   dash.style.display = 'flex';
 
   setTimeout(() => drawChart(ytd && ytd.monthlyTrend), 50);
