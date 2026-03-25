@@ -191,7 +191,7 @@
     .tbl-row.active { background: var(--gold-faint); }
     .tbl-row.active .bar-arrow { transform: rotate(180deg); }
 
-    /* ── Urgent Drill-down ── */
+    /* ── Urgent Drill-down (click → recent examples) ── */
     .urgent-drill {
       margin: 0 10px 8px 10px;
       padding: 14px 16px;
@@ -200,6 +200,34 @@
       border-radius: var(--r-sm);
       animation: fadeIn .15s ease;
     }
+
+    /* ── Issue Breakdown Tooltip (hover) ── */
+    .issue-tooltip {
+      position: fixed; z-index: 1000;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: 0 8px 32px rgba(0,0,0,.14);
+      padding: 14px 16px;
+      min-width: 270px; max-width: 340px;
+      pointer-events: none;
+      animation: fadeIn .12s ease;
+    }
+    .tt-title {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--text-2);
+      margin-bottom: 10px;
+    }
+    .tt-row {
+      display: grid; grid-template-columns: 1fr 80px 28px;
+      gap: 8px; align-items: center; margin-bottom: 6px;
+    }
+    .tt-label { font-size: 12px; color: var(--text); }
+    .tt-bar-wrap { background: var(--bg); border-radius: 3px; height: 6px; overflow: hidden; }
+    .tt-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; }
+    .tt-cnt { font-size: 12px; font-weight: 600; color: var(--text-2); text-align: right; }
+    .tt-empty { font-size: 12px; color: var(--text-3); padding: 4px 0; }
+    .tt-hint { font-size: 11px; color: var(--text-3); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 
     .rank {
       width: 30px; height: 30px; border-radius: 50%;
@@ -413,6 +441,7 @@
   </style>
 </head>
 <body>
+<div id="issue-tooltip" class="issue-tooltip" style="display:none"></div>
 
 <!-- ── Header ────────────────────────────────────────────────────────────── -->
 <header class="app-header">
@@ -976,7 +1005,7 @@ function buildUrgent(svcIssues, facIssues, fnbIssues, ts, pl) {
       const uid = urgentSafeId(issue.category);
       const esc = issue.category.replace(/'/g, "\\'");
       return `
-      <div class="tbl-row" onclick="drillUrgent('${esc}', this)">
+      <div class="tbl-row" onclick="drillUrgent('${esc}', this)" onmouseenter="showUrgentTooltip('${esc}', this)" onmouseleave="hideUrgentTooltip()">
         <span class="${rankClass(i)}">${i + 1}</span>
         <span class="issue-name">${issue.category}</span>
         <span><span class="pill">${issue.count}</span></span>
@@ -1258,11 +1287,48 @@ function drillUrgent(cat, rowEl) {
     return d >= startDate && d <= endDate;
   });
 
-  // ── Try keyword classifier first ──
-  const hasClassifier = !!ISSUE_CLASSIFIERS[cat];
-  let mainHtml = '';
+  // ── Click shows most recent guest examples ──
+  const recent = matching
+    .filter(r => r.title && r.title !== '(untitled)')
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 8);
+  const exampleRows = recent.map(r => {
+    const meta = [
+      r.dept ? `<span class="imeta-dept">${r.dept}</span>` : null,
+      r.room ? `Room ${r.room}` : null,
+      fmtDate(r.date)
+    ].filter(Boolean).join(' \u00b7 ');
+    return `<div class="incident-row"><div class="incident-title">${r.title}</div><div class="incident-meta">${meta}</div></div>`;
+  }).join('');
 
-  if (hasClassifier) {
+  panel.innerHTML = `
+    <div class="drill-header">
+      <span>Most Recent Guest Incidents</span>
+      <span class="drill-total">${matching.length} total occurrences</span>
+    </div>
+    ${exampleRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No titled records found.</div>'}`;
+  panel.style.display = 'block';
+}
+
+// ── Hover tooltip: issue sub-category breakdown ─────────────────────────────
+function showUrgentTooltip(cat, rowEl) {
+  const tt = document.getElementById('issue-tooltip');
+  if (!tt || !allRecords.length) return;
+
+  const [startDate, endDate] = getPeriodRange(currentPeriod, customFromVal, customToVal);
+  if (!startDate) return;
+
+  const catAliases = new Set([cat].concat(CAT_ALIASES_OF[cat] || []));
+  const matching = allRecords.filter(r => {
+    if (!(r.cats || []).some(c => catAliases.has(c))) return false;
+    const d = new Date(r.date + (r.date.length === 10 ? 'T00:00:00Z' : ''));
+    return d >= startDate && d <= endDate;
+  });
+
+  let html = `<div class="tt-title">Issue Breakdown</div>`;
+
+  const rules = ISSUE_CLASSIFIERS[cat];
+  if (rules) {
     const subMap = {};
     for (const r of matching) {
       const sub = classifyIssue(r.title || '', cat);
@@ -1275,50 +1341,39 @@ function drillUrgent(cat, rowEl) {
     const otherCount = subMap['Other'] || 0;
     if (otherCount > 0) topSubs.push({ s: 'Other / Unclassified', count: otherCount });
 
-    const maxSub = topSubs.length ? topSubs[0].count : 1;
-    const subRows = topSubs.map(({ s, count }) => `
-      <div class="drill-row">
-        <span class="drill-cat">${s}</span>
-        <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxSub*100).toFixed(1)}%"></div></div>
-        <span class="drill-cnt">${count}</span>
-      </div>`).join('');
-
-    mainHtml = `
-      <div class="drill-header">
-        <span>Issue Breakdown</span>
-        <span class="drill-total">${matching.length} occurrences</span>
-      </div>
-      ${subRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">Unable to classify issues.</div>'}`;
-
+    if (topSubs.length) {
+      const maxCount = topSubs[0].count;
+      html += topSubs.map(({ s, count }) => `
+        <div class="tt-row">
+          <span class="tt-label">${s}</span>
+          <div class="tt-bar-wrap"><div class="tt-bar-fill" style="width:${(count/maxCount*100).toFixed(1)}%"></div></div>
+          <span class="tt-cnt">${count}</span>
+        </div>`).join('');
+    } else {
+      html += `<div class="tt-empty">${matching.length} occurrence${matching.length !== 1 ? 's' : ''} — no breakdown available</div>`;
+    }
   } else {
-    // Fallback: show recent issue titles as the breakdown
-    mainHtml = `
-      <div class="drill-header">
-        <span>Issue Breakdown</span>
-        <span class="drill-total">${matching.length} occurrences</span>
-      </div>`;
+    html += `<div class="tt-empty">${matching.length} occurrence${matching.length !== 1 ? 's' : ''}</div>`;
   }
+  html += `<div class="tt-hint">&#9660; Click row to see recent guest examples</div>`;
 
-  // ── Always show 5 most recent examples ──
-  const recent = matching
-    .filter(r => r.title && r.title !== '(untitled)')
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
-  const exampleRows = recent.map(r => {
-    const meta = [
-      r.dept ? `<span class="imeta-dept">${r.dept}</span>` : null,
-      r.room ? `Room ${r.room}` : null,
-      fmtDate(r.date)
-    ].filter(Boolean).join(' \u00b7 ');
-    return `<div class="incident-row"><div class="incident-title">${r.title}</div><div class="incident-meta">${meta}</div></div>`;
-  }).join('');
+  tt.innerHTML = html;
 
-  panel.innerHTML = mainHtml + (recent.length ? `
-    <div class="drill-header" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-      <span>Most Recent Examples</span>
-    </div>
-    ${exampleRows}` : '');
-  panel.style.display = 'block';
+  // Position: prefer right of row, flip left if near viewport edge
+  const rect = rowEl.getBoundingClientRect();
+  const ttW = 310;
+  let left = rect.right + 14;
+  if (left + ttW > window.innerWidth - 12) left = rect.left - ttW - 14;
+  const top = Math.min(Math.max(rect.top, 8), window.innerHeight - tt.offsetHeight - 8);
+
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+  tt.style.display = 'block';
+}
+
+function hideUrgentTooltip() {
+  const tt = document.getElementById('issue-tooltip');
+  if (tt) tt.style.display = 'none';
 }
 
 // ── Department drill-down ──────────────────────────────────────────────────
