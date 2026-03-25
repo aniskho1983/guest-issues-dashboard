@@ -632,6 +632,125 @@ var SERVICE_DEPT_ORDER = [
     titleKeys: ['fitness','gym','treadmill','elliptical','peloton','spin bike'] },
 ];
 
+// ── Department-level title classifiers ────────────────────────────────────
+// Used in the hover tooltip for Service Issues rows.
+// Each entry maps a department label to keyword rules that classify issue titles
+// into meaningful sub-topics visible to that department head.
+// Rules are checked in order — first match wins.
+var DEPT_CLASSIFIERS = {
+
+  'Front Desk': [
+    { sub: 'Loyalty / Status Not Recognized', keys: ['titanium','platinum','ambassador','amex','fhr','marriott','loyalty','points','repeat guest','no upgrade','not acknowledged','name not used','no recogni','acknowledgment'] },
+    { sub: 'Room Not Ready at Check-in',       keys: ['room not ready','not ready at check','wait for room','waiting for room','room wait','30 min wait','1 hour wait','2 hour wait'] },
+    { sub: 'Reservation / Room Assignment',    keys: ['reservation','room type','mismatch','wrong room','room assignment','promo code','rate code','virtuoso','king to double','placed in pq','res mismatch'] },
+    { sub: 'Staff Attitude',                   keys: ['aloof','snobby','rude','cold','flat','annoyed','attitude','below standard','not greeted','snooty','stuffy','seemed to have cared less'] },
+    { sub: 'Billing / Charges',                keys: ['billing','charge','cc authorized','credit','invoice','gift certificate','rate code','charged','authorized for','payment','$'] },
+    { sub: 'Amenity Not Delivered',            keys: ['amenity not moved','sleep amenity','wine bottle','fruit basket','charger','wrong amenity','not received','not delivered','amenity delivery'] },
+    { sub: 'Luggage / Lost Items',             keys: ['luggage','lost & found','lost and found','sunglasses','laptop charger','forgotten item','delivered to wrong','luggage delivery','bellman'] },
+    { sub: 'Communication Failure',            keys: ["couldn't reach",'pre-arrival','ai answering','phone system','misrouted','not communicated','not informed','canary','ai phone','difficulty reaching'] },
+    { sub: 'Noise Complaint',                  keys: ['noise','drilling','drill','loud','barking','dog','leaf blower','elevator noise','music noise','disturbance','sleep disruption'] },
+    { sub: 'Check-out / Late Departure',       keys: ['check out','checkout','late check','early check','late departure','late checkout'] },
+  ],
+
+  'Housekeeping': [
+    { sub: 'Turndown Missed / Late',           keys: ['turndown','no turndown','not turned','turndown inquiry','did not turn','turndown not','after 8','after 9','turndown timing','no evening service'] },
+    { sub: 'Room Not Cleaned / Dirty',         keys: ['dirty','not clean','hair on','not cleaned','floor','stain','moldy','mould','smelled','funky','soiled','face mask left','left in room','previous guest','debris','crumbs'] },
+    { sub: 'Service Timing / Disruption',      keys: ['came at','came to room','knocked at','4pm','5pm','early','too late','disturbed','during stay','entered without','room despite','checkout knock'] },
+    { sub: 'Supplies Not Replenished',         keys: ['replenish','minibar','coffee maker','shower cap','toiletries','body balm','door hanger','missing','not refilled','not restocked','coffee not','supplies','no towels','no coffee'] },
+    { sub: 'Pillow / Bedding Request',         keys: ['pillow','soft pillow','hard pillow','too many pillows','too few pillows','extra pillow','pillow options','firm','bedding request'] },
+    { sub: 'Item Damaged or Taken',            keys: ['taken by mistake','washcloth','earplugs','iron','threw away','threw out','broken','damaged by housekeeping'] },
+  ],
+
+  'Valet': [
+    { sub: 'Long Wait Time',                   keys: ['wait time','long wait','delay','delayed','30 min','hour wait','dinner rush','hours instead','waiting for car'] },
+    { sub: 'No Text / Communication',          keys: ['no valet text','no text','couldn\'t reach','miscommunication','contact info','multiple requests','phone delay','couldn\'t request'] },
+    { sub: 'Vehicle Damage',                   keys: ['damage','window','phone holder','vehicle moved','settings changed','music','tesla key','vehicle settings','scratched','dent','car damage'] },
+    { sub: 'Pricing / Charges',                keys: ['pricing','price','excessive','charge','fee','$65','comped','tip'] },
+    { sub: 'Process / System Issue',           keys: ['online registration','car registration','unclear','system','app','assumes guest','dinner guest','hotel guest','not a hotel guest'] },
+  ],
+
+  'Engineering': [
+    { sub: 'Slow Response Time',               keys: ['waited','hours','delay','response time','never came','slow to respond','did not come','no response'] },
+    { sub: 'Issue Not Fixed / Returned',       keys: ['not fixed','came back','still broken','returned','same issue','recurring','didn\'t fix','fix not resolved'] },
+    { sub: 'Communication / Follow-up',        keys: ['no follow','didn\'t follow','no update','not communicated','not informed'] },
+  ],
+
+  'Peacock': [
+    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','disappeared','gap between','excessive wait','waited','long time','empty tables','service gap','20 minutes','30 minutes','server gone'] },
+    { sub: 'Food Quality / Temperature',       keys: ['temperature','raw','salty','watery','strange flavor','inconsistent','not good','overcooked','undercooked','dry','flavor','cold food','lukewarm'] },
+    { sub: 'Staff Attitude',                   keys: ['stuffy','snooty','not pleasant','rude','snobby','cold','attitude','unprofessional','not welcoming'] },
+    { sub: 'Reservation / Seating',            keys: ['reservation','can\'t get','unable to get','hotel guest','hard to find seating','seating','no availability','not prioritized'] },
+    { sub: 'Order / Dish Error',               keys: ['wrong dish','wrong order','missing item','incorrect','forgot','pork chop','pancakes','curry','dish not as described'] },
+  ],
+
+  'Peacock Lounge': [
+    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','waited','long time','service gap','no server','bar wait'] },
+    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flat','watered down','not good','drink incorrect','flavor','not as expected'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','not pleasant','unfriendly','snobby','not welcoming','dismissive'] },
+    { sub: 'Noise / Ambiance',                 keys: ['loud','noise','music','ambiance','too crowded','no seating','standing room'] },
+  ],
+
+  "Goldie's": [
+    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','server'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
+    { sub: 'Order Error',                      keys: ['wrong order','missing','incorrect','forgot','not what i ordered'] },
+  ],
+
+  'Kappo Kappo': [
+    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked','sushi','fish'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
+    { sub: 'Reservation / Availability',       keys: ['reservation','no availability','couldn\'t get','booked','fully booked'] },
+  ],
+
+  'Quill': [
+    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','no server','bar wait'] },
+    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flavor','not good','cocktail','drink'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
+  ],
+
+  'La Piscina': [
+    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','server','pool service'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming','dismissive'] },
+    { sub: 'Pool-Side Service',                keys: ['towel','chair','umbrella','pool attendant','not serviced','no service at pool'] },
+  ],
+
+  'Pool': [
+    { sub: 'Towel / Chair Availability',       keys: ['towel','chair','no chair','chair available','towel service','no towel','reserved chairs'] },
+    { sub: 'Staff Unresponsive',               keys: ['no staff','no one around','couldn\'t find','no attendant','waited','unresponsive','slow'] },
+    { sub: 'Cleanliness',                      keys: ['dirty','not clean','debris','leaves','algae','pool dirty','not maintained'] },
+    { sub: 'Food / Beverage at Pool',          keys: ['food','drink','beverage','order','slow order','no menu','pool bar'] },
+  ],
+
+  'In Room Dining': [
+    { sub: 'Food Quality',                     keys: ['salty','inedible','cold','not tasty','strange flavor','lukewarm','quality','bland','watery','raw','not fresh','overcooked'] },
+    { sub: 'Wrong or Missing Item',            keys: ['wrong room','missing','incorrect delivery','missing milk','menu mismatch','not what','wrong order','forgot','incorrect item'] },
+    { sub: 'Slow Delivery',                    keys: ['delay','late','wait','took too long','never arrived','hours','never delivered','delivery time'] },
+    { sub: 'No Follow-up / Communication',     keys: ['no follow','no callback','no update','no one came','didn\'t follow'] },
+  ],
+
+  'Minibar': [
+    { sub: 'Not Stocked / Empty',              keys: ['not stocked','empty','not refreshed','nothing in','ran out','not replenished','missing items','not filled'] },
+    { sub: 'Wrong Items / Expired',            keys: ['wrong items','expired','incorrect','not what expected','wrong brand','stale'] },
+    { sub: 'Billing / Charge',                 keys: ['charged','billing','charge','fee','billed for','didn\'t use','incorrectly charged'] },
+  ],
+
+  'Spa': [
+    { sub: 'Booking / Scheduling',             keys: ['booking','couldn\'t book','schedule','appointment','no availability','reservation','not available'] },
+    { sub: 'Treatment Quality',                keys: ['treatment','massage','facial','pressure','technique','not good','not what expected','poor quality','rushed'] },
+    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming','dismissive','unprofessional'] },
+    { sub: 'Facility Condition',               keys: ['dirty','not clean','cold','temperature','locker','towel','robe','facility'] },
+  ],
+
+  'Gym': [
+    { sub: 'Equipment Not Working',            keys: ['broken','not working','out of order','treadmill','elliptical','bike','machine','equipment'] },
+    { sub: 'Cleanliness',                      keys: ['dirty','not clean','debris','towels','wipes','not maintained','smell'] },
+    { sub: 'Entertainment / TV',               keys: ['tv','entertainment','music','no sound','screen','channel','streaming'] },
+  ],
+};
+
 // ── Issue sub-classifiers (keyword → sub-category, built from real Notion data) ──
 var ISSUE_CLASSIFIERS = {
 
@@ -1518,7 +1637,7 @@ function drillServiceDept(label, rowEl) {
   panel.style.display = 'block';
 }
 
-// ── Service dept hover tooltip (top issue categories) ──────────────────────
+// ── Service dept hover tooltip — keyword-based sub-topic breakdown ──────────
 function showServiceTooltip(label, rowEl) {
   const tt = document.getElementById('issue-tooltip');
   if (!tt || !allRecords.length) return;
@@ -1526,31 +1645,44 @@ function showServiceTooltip(label, rowEl) {
   if (!startDate) return;
   const matching = getServiceDeptRecords(label, startDate, endDate);
 
-  // Top non-positive categories for this dept
-  const catMap = {};
-  for (const r of matching) {
-    for (const rawCat of (r.cats || [])) {
-      const cat = normalizeCat(rawCat);
-      if (isNonActionable(cat)) continue;
-      catMap[cat] = (catMap[cat] || 0) + 1;
-    }
-  }
-  const topCats = Object.entries(catMap)
-    .map(([c, n]) => ({ c, n }))
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 6);
+  const rules = DEPT_CLASSIFIERS[label];
+  let html = `<div class="tt-title">Issue Breakdown — ${label}</div>`;
 
-  let html = `<div class="tt-title">Top Issue Categories</div>`;
-  if (topCats.length) {
-    const maxN = topCats[0].n;
-    html += topCats.map(({ c, n }) => `
-      <div class="tt-row">
-        <span class="tt-label">${c}</span>
-        <div class="tt-bar-wrap"><div class="tt-bar-fill" style="width:${(n/maxN*100).toFixed(1)}%"></div></div>
-        <span class="tt-cnt">${n}</span>
-      </div>`).join('');
+  if (rules && matching.length) {
+    // Classify each record's title against dept-specific keyword rules
+    const subMap = {};
+    for (const r of matching) {
+      const t = (r.title || '').toLowerCase();
+      let matched = false;
+      for (const { sub, keys } of rules) {
+        if (keys.some(k => t.includes(k))) {
+          subMap[sub] = (subMap[sub] || 0) + 1;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) subMap['Other'] = (subMap['Other'] || 0) + 1;
+    }
+    const topSubs = Object.entries(subMap)
+      .filter(([s]) => s !== 'Other')
+      .map(([s, n]) => ({ s, n }))
+      .sort((a, b) => b.n - a.n);
+    const otherN = subMap['Other'] || 0;
+    if (otherN) topSubs.push({ s: 'Other / Unclassified', n: otherN });
+
+    if (topSubs.length) {
+      const maxN = topSubs[0].n;
+      html += topSubs.map(({ s, n }) => `
+        <div class="tt-row">
+          <span class="tt-label">${s}</span>
+          <div class="tt-bar-wrap"><div class="tt-bar-fill" style="width:${(n/maxN*100).toFixed(1)}%"></div></div>
+          <span class="tt-cnt">${n}</span>
+        </div>`).join('');
+    } else {
+      html += `<div class="tt-empty">${matching.length} records</div>`;
+    }
   } else {
-    html += `<div class="tt-empty">${matching.length} records — no category data</div>`;
+    html += `<div class="tt-empty">${matching.length} record${matching.length !== 1 ? 's' : ''} in this period</div>`;
   }
   html += `<div class="tt-hint">&#9660; Click to see recent examples</div>`;
   tt.innerHTML = html;
@@ -1559,7 +1691,7 @@ function showServiceTooltip(label, rowEl) {
   const ttW = 310;
   let left = rect.right + 14;
   if (left + ttW > window.innerWidth - 12) left = rect.left - ttW - 14;
-  const top = Math.min(Math.max(rect.top, 8), window.innerHeight - 300);
+  const top = Math.min(Math.max(rect.top, 8), window.innerHeight - 350);
   tt.style.left = left + 'px';
   tt.style.top = top + 'px';
   tt.style.display = 'block';
