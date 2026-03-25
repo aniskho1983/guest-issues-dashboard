@@ -640,114 +640,115 @@ var SERVICE_DEPT_ORDER = [
 var DEPT_CLASSIFIERS = {
 
   'Front Desk': [
-    { sub: 'Loyalty / Status Not Recognized', keys: ['titanium','platinum','ambassador','amex','fhr','marriott','loyalty','points','repeat guest','no upgrade','not acknowledged','name not used','no recogni','acknowledgment'] },
-    { sub: 'Room Not Ready at Check-in',       keys: ['room not ready','not ready at check','wait for room','waiting for room','room wait','30 min wait','1 hour wait','2 hour wait'] },
-    { sub: 'Reservation / Room Assignment',    keys: ['reservation','room type','mismatch','wrong room','room assignment','promo code','rate code','virtuoso','king to double','placed in pq','res mismatch'] },
-    { sub: 'Staff Attitude',                   keys: ['aloof','snobby','rude','cold','flat','annoyed','attitude','below standard','not greeted','snooty','stuffy','seemed to have cared less'] },
-    { sub: 'Billing / Charges',                keys: ['billing','charge','cc authorized','credit','invoice','gift certificate','rate code','charged','authorized for','payment','$'] },
-    { sub: 'Amenity Not Delivered',            keys: ['amenity not moved','sleep amenity','wine bottle','fruit basket','charger','wrong amenity','not received','not delivered','amenity delivery'] },
-    { sub: 'Luggage / Lost Items',             keys: ['luggage','lost & found','lost and found','sunglasses','laptop charger','forgotten item','delivered to wrong','luggage delivery','bellman'] },
-    { sub: 'Communication Failure',            keys: ["couldn't reach",'pre-arrival','ai answering','phone system','misrouted','not communicated','not informed','canary','ai phone','difficulty reaching'] },
+    { sub: 'Loyalty / Status Not Recognized', keys: ['titanium','platinum','ambassador','amex','fhr','marriott','loyalty','points','repeat guest','no upgrade','not acknowledged','name not used','no recogni','acknowledgment','birthday','underwhelming arrival','arrival underwhelming'] },
+    { sub: 'Room Not Ready at Check-in',       keys: ['room not ready','not ready at check','wait for room','waiting for room','room wait','wanted upgrade','wanted an upgrade'] },
+    { sub: 'Reservation / Room Assignment',    keys: ['reservation','room type','mismatch','wrong room','room assignment','promo code','rate code','virtuoso','king to double','placed in pq','res mismatch','check-in confusion','incorrect email','chaotic arrival','arrival rated','reservation accuracy','arrival experience'] },
+    { sub: 'Room Size / View',                 keys: ['view','garage view','pool view','too small','room too small','small room','room size','suite upgrade','tiny','disappointing view','limited natural light','dissatisfied with','wanted a better view'] },
+    { sub: 'Staff Attitude / Arrival Quality', keys: ['aloof','snobby','rude','cold','flat','annoyed','attitude','below standard','not greeted','snooty','stuffy','underwhelming','not asked','seemed to have cared less','arrival poor','poor arrival','1/5','2/5'] },
+    { sub: 'Billing / Charges',                keys: ['billing','charge','cc authorized','credit','invoice','gift certificate','charged','authorized for','payment','$','final bill','bill confusing'] },
     { sub: 'Noise Complaint',                  keys: ['noise','drilling','drill','loud','barking','dog','leaf blower','elevator noise','music noise','disturbance','sleep disruption'] },
+    { sub: 'Communication Failure',            keys: ["couldn't reach",'pre-arrival','ai answering','phone system','misrouted','not communicated','not informed','canary','ai phone','difficulty reaching','unanswered','late checkout not noted','not noted'] },
+    { sub: 'Luggage / Lost Items',             keys: ['luggage','lost & found','lost and found','sunglasses','laptop charger','forgotten item','bellman'] },
     { sub: 'Check-out / Late Departure',       keys: ['check out','checkout','late check','early check','late departure','late checkout'] },
   ],
 
   'Housekeeping': [
-    { sub: 'Turndown Missed / Late',           keys: ['turndown','no turndown','not turned','turndown inquiry','did not turn','turndown not','after 8','after 9','turndown timing','no evening service'] },
-    { sub: 'Room Not Cleaned / Dirty',         keys: ['dirty','not clean','hair on','not cleaned','floor','stain','moldy','mould','smelled','funky','soiled','face mask left','left in room','previous guest','debris','crumbs'] },
-    { sub: 'Service Timing / Disruption',      keys: ['came at','came to room','knocked at','4pm','5pm','early','too late','disturbed','during stay','entered without','room despite','checkout knock'] },
-    { sub: 'Supplies Not Replenished',         keys: ['replenish','minibar','coffee maker','shower cap','toiletries','body balm','door hanger','missing','not refilled','not restocked','coffee not','supplies','no towels','no coffee'] },
-    { sub: 'Pillow / Bedding Request',         keys: ['pillow','soft pillow','hard pillow','too many pillows','too few pillows','extra pillow','pillow options','firm','bedding request'] },
-    { sub: 'Item Damaged or Taken',            keys: ['taken by mistake','washcloth','earplugs','iron','threw away','threw out','broken','damaged by housekeeping'] },
+    { sub: 'Turndown Missed / Late',           keys: ['turndown','no turndown','not turned','turndown inquiry','did not turn','turndown not','after 8','after 9','turndown timing','no evening service','turndown service missed','timing inconsistencies'] },
+    { sub: 'Room Not Cleaned / Dirty',         keys: ['dirty','not clean','hair on','not cleaned','floor','stain','moldy','mould','smell','funky','soiled','face mask left','left in room','previous guest','debris','crumbs','iron had','pink stain','red stain','burned into','glass bottled water','paper in it','not serviced'] },
+    { sub: 'Entered Room / Service Disruption',keys: ['came at','came to room','knocked at','4pm','5pm','entered without','room despite','checkout knock','disturbed','during stay','entered room','despite checkout','despite 2pm'] },
+    { sub: 'Supplies Not Replenished',         keys: ['replenish','coffee maker','shower cap','toiletries','body balm','door hanger','not refilled','not restocked','coffee not','supplies','no towels','no coffee','shower caps','body wash','blanket delivery','no breakfast'] },
+    { sub: 'Pillow / Bedding Quality',         keys: ['pillow','soft pillow','hard pillow','too many pillows','too few pillows','extra pillow','pillow options','duvet','duvet cover','sheets','linen','blanket','bedding','side sleeper','readjustment','firm','bed comfort','bed very soft'] },
+    { sub: 'Item Damaged or Taken',            keys: ['taken by mistake','washcloth','earplugs','threw away','threw out','broken','damaged by housekeeping'] },
   ],
 
   'Valet': [
-    { sub: 'Long Wait Time',                   keys: ['wait time','long wait','delay','delayed','30 min','hour wait','dinner rush','hours instead','waiting for car'] },
-    { sub: 'No Text / Communication',          keys: ['no valet text','no text','couldn\'t reach','miscommunication','contact info','multiple requests','phone delay','couldn\'t request'] },
-    { sub: 'Vehicle Damage',                   keys: ['damage','window','phone holder','vehicle moved','settings changed','music','tesla key','vehicle settings','scratched','dent','car damage'] },
-    { sub: 'Pricing / Charges',                keys: ['pricing','price','excessive','charge','fee','$65','comped','tip'] },
-    { sub: 'Process / System Issue',           keys: ['online registration','car registration','unclear','system','app','assumes guest','dinner guest','hotel guest','not a hotel guest'] },
+    { sub: 'Long Wait Time',                   keys: ['wait time','long wait','delay','delayed','30 min','hour wait','dinner rush','hours instead','waiting for car','30-min delay','phone left at valet'] },
+    { sub: 'No Text / Communication',          keys: ['no valet text','no text','couldn\'t reach','miscommunication','contact info','multiple requests','phone delay','couldn\'t request','no valet text received','multiple front desk requests'] },
+    { sub: 'Vehicle Damage / Handling',        keys: ['damage','window','phone holder','vehicle moved','removed while','settings changed','music','tesla key','vehicle settings','scratched','dent','car damage','vehicle removed','moved while guest'] },
+    { sub: 'Pricing / Charges',                keys: ['pricing','price','excessive','charge','fee','$65','comped','tip','pricey'] },
+    { sub: 'Process / System Issue',           keys: ['online registration','car registration','unclear','system','app','hotel guest','not a hotel guest','dinner guest','bag of'] },
   ],
 
   'Engineering': [
-    { sub: 'Slow Response Time',               keys: ['waited','hours','delay','response time','never came','slow to respond','did not come','no response'] },
-    { sub: 'Issue Not Fixed / Returned',       keys: ['not fixed','came back','still broken','returned','same issue','recurring','didn\'t fix','fix not resolved'] },
-    { sub: 'Communication / Follow-up',        keys: ['no follow','didn\'t follow','no update','not communicated','not informed'] },
+    { sub: 'Slow Response / No Follow-up',     keys: ['waited','delay','response time','never came','slow to respond','did not come','no response','no follow','not communicated','no update','hours'] },
+    { sub: 'Issue Not Resolved',               keys: ['not fixed','came back','still broken','returned','same issue','recurring','didn\'t fix','fix not resolved','declined eng fix'] },
   ],
 
   'Peacock': [
-    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','disappeared','gap between','excessive wait','waited','long time','empty tables','service gap','20 minutes','30 minutes','server gone'] },
-    { sub: 'Food Quality / Temperature',       keys: ['temperature','raw','salty','watery','strange flavor','inconsistent','not good','overcooked','undercooked','dry','flavor','cold food','lukewarm'] },
-    { sub: 'Staff Attitude',                   keys: ['stuffy','snooty','not pleasant','rude','snobby','cold','attitude','unprofessional','not welcoming'] },
-    { sub: 'Reservation / Seating',            keys: ['reservation','can\'t get','unable to get','hotel guest','hard to find seating','seating','no availability','not prioritized'] },
-    { sub: 'Order / Dish Error',               keys: ['wrong dish','wrong order','missing item','incorrect','forgot','pork chop','pancakes','curry','dish not as described'] },
+    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','disappeared','gap between','excessive wait','waited','long time','empty tables','service gap','20 minutes','30 minutes','server gone','not greeted','10 minutes','waiter disappeared','between courses','too long','in rush','brunch','breakfast wait'] },
+    { sub: 'Food / Drink Quality',             keys: ['temperature','raw','salty','watery','strange flavor','inconsistent','not good','overcooked','undercooked','dry','flavor','cold food','lukewarm','cleaning product','quality','pork chop','pancakes','curry','smoothie','latte','oat latte','foam','mushy','not as described','bread','not satisfied','watery latte','coffee quality','did not like'] },
+    { sub: 'Staff Attitude / Service',         keys: ['stuffy','snooty','not pleasant','rude','snobby','cold','attitude','unprofessional','not welcoming','unsafe','communication issue','accent'] },
+    { sub: 'Reservation / Seating Access',     keys: ['reservation','can\'t get','unable to get','hotel guest','hard to find seating','seating','no availability','not prioritized','too packed','couldn\'t dine','fully committed','bar seating'] },
+    { sub: 'Order / Item Error',               keys: ['wrong dish','wrong order','missing item','incorrect','forgot','dish not as','food thrown','wine bottle cleared','comped','to-go','takeaway','order not ready','cutlery','lids','not rung','rung in','server delayed'] },
+    { sub: 'Pricing',                          keys: ['pricey','too expensive','cocktails','pricing','for what they are'] },
   ],
 
   'Peacock Lounge': [
-    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','waited','long time','service gap','no server','bar wait'] },
-    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flat','watered down','not good','drink incorrect','flavor','not as expected'] },
+    { sub: 'Slow Service / Long Wait',         keys: ['slow','wait','took too long','delay','waited','long time','service gap','no server','bar wait','noise','music from quill','couldn\'t sleep'] },
+    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flat','watered down','not good','drink incorrect','flavor','not as expected','incorrect drinks','pushback','tab had incorrect'] },
     { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','not pleasant','unfriendly','snobby','not welcoming','dismissive'] },
-    { sub: 'Noise / Ambiance',                 keys: ['loud','noise','music','ambiance','too crowded','no seating','standing room'] },
   ],
 
   "Goldie's": [
     { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','server'] },
-    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked','not satisfied','did not like'] },
     { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
-    { sub: 'Order Error',                      keys: ['wrong order','missing','incorrect','forgot','not what i ordered'] },
+    { sub: 'Order Error',                      keys: ['wrong order','missing','incorrect','forgot','not what'] },
   ],
 
   'Kappo Kappo': [
     { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited'] },
-    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked','sushi','fish'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked','sushi','fish','not satisfied','did not like'] },
     { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
     { sub: 'Reservation / Availability',       keys: ['reservation','no availability','couldn\'t get','booked','fully booked'] },
   ],
 
   'Quill': [
     { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','no server','bar wait'] },
-    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flavor','not good','cocktail','drink'] },
+    { sub: 'Drink / Food Quality',             keys: ['quality','taste','wrong','cold','flavor','not good','cocktail','drink','tab','incorrect drinks'] },
     { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming'] },
+    { sub: 'Noise / Sleep Disruption',         keys: ['noise','music','loud','couldn\'t sleep','sleep','quill room'] },
   ],
 
   'La Piscina': [
-    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','server','pool service'] },
-    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked'] },
+    { sub: 'Slow Service / Wait',              keys: ['slow','wait','took too long','delay','waited','server','pool service','track down','had to find','service rated','needs improvement','not enough service'] },
+    { sub: 'Food Quality',                     keys: ['quality','taste','cold','wrong','flavor','not good','raw','overcooked','not fresh','pastries','cold pastries','saffron','chicken','tajine','missing','rated 1','rated 3','score'] },
+    { sub: 'Reservation / Availability',       keys: ['reservation','capacity','crowded','hard to get','buyout','no availability','couldn\'t get'] },
     { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming','dismissive'] },
-    { sub: 'Pool-Side Service',                keys: ['towel','chair','umbrella','pool attendant','not serviced','no service at pool'] },
   ],
 
   'Pool': [
-    { sub: 'Towel / Chair Availability',       keys: ['towel','chair','no chair','chair available','towel service','no towel','reserved chairs'] },
-    { sub: 'Staff Unresponsive',               keys: ['no staff','no one around','couldn\'t find','no attendant','waited','unresponsive','slow'] },
-    { sub: 'Cleanliness',                      keys: ['dirty','not clean','debris','leaves','algae','pool dirty','not maintained'] },
-    { sub: 'Food / Beverage at Pool',          keys: ['food','drink','beverage','order','slow order','no menu','pool bar'] },
+    { sub: 'Towel / Chair / Seating',          keys: ['towel','chair','no chair','seating','no towel','reserved chairs','seating reduced','pool capacity','cleanup','seat'] },
+    { sub: 'Slow Drink / Food Service',        keys: ['drink service','slow drink','food','beverage','order','slow order','no menu','pool bar'] },
+    { sub: 'Staff / Cleanliness',              keys: ['no staff','no one around','couldn\'t find','no attendant','unresponsive','dirty','not clean','debris','leaves','algae','window washer','dripping','bird'] },
+    { sub: 'Pool Closed / Not Ready',          keys: ['closed','not ready','not open','pool closed'] },
   ],
 
   'In Room Dining': [
-    { sub: 'Food Quality',                     keys: ['salty','inedible','cold','not tasty','strange flavor','lukewarm','quality','bland','watery','raw','not fresh','overcooked'] },
-    { sub: 'Wrong or Missing Item',            keys: ['wrong room','missing','incorrect delivery','missing milk','menu mismatch','not what','wrong order','forgot','incorrect item'] },
-    { sub: 'Slow Delivery',                    keys: ['delay','late','wait','took too long','never arrived','hours','never delivered','delivery time'] },
-    { sub: 'No Follow-up / Communication',     keys: ['no follow','no callback','no update','no one came','didn\'t follow'] },
+    { sub: 'Food / Drink Quality',             keys: ['salty','inedible','cold','not tasty','strange flavor','lukewarm','quality','bland','watery','raw','not fresh','overcooked','not creamy','mushy','not toasted','coffee quality','not satisfied','fries','club sandwich','porridge','rigatoni','oatmeal cold'] },
+    { sub: 'Wrong / Missing Item',             keys: ['wrong room','missing','incorrect delivery','menu mismatch','not what','wrong order','forgot','incorrect item','spoon missing','soup','cookie','ice','compendium','milk','hummus','sandwich','order confusion'] },
+    { sub: 'Slow / Late Delivery',             keys: ['delay','late','wait','took too long','never arrived','hours','never delivered','delivery time','10 min late','15 min late','40 min','delayed','not rung in','server delayed ringing','hour to be delivered','delivered late','in rush'] },
+    { sub: 'Tray / Door Knob Not Handled',     keys: ['tray','door knob','not picked up','trayaway','tray never removed','overnight','not removed','held at desk','door left'] },
+    { sub: 'Staff Attitude',                   keys: ['unsavory','rude','interaction','attitude','not pleasant','unfriendly'] },
   ],
 
   'Minibar': [
-    { sub: 'Not Stocked / Empty',              keys: ['not stocked','empty','not refreshed','nothing in','ran out','not replenished','missing items','not filled'] },
+    { sub: 'Not Stocked / Not Replenished',    keys: ['not stocked','empty','not refreshed','nothing in','ran out','not replenished','missing items','not filled','not restocked','in-room coffee not replenished','minibar not'] },
     { sub: 'Wrong Items / Expired',            keys: ['wrong items','expired','incorrect','not what expected','wrong brand','stale'] },
-    { sub: 'Billing / Charge',                 keys: ['charged','billing','charge','fee','billed for','didn\'t use','incorrectly charged'] },
+    { sub: 'Billing / Charge',                 keys: ['charged','billing','charge','fee','billed for','didn\'t use','incorrectly charged','opened water','concerned about charges'] },
   ],
 
   'Spa': [
-    { sub: 'Booking / Scheduling',             keys: ['booking','couldn\'t book','schedule','appointment','no availability','reservation','not available'] },
-    { sub: 'Treatment Quality',                keys: ['treatment','massage','facial','pressure','technique','not good','not what expected','poor quality','rushed'] },
-    { sub: 'Staff Attitude',                   keys: ['rude','cold','attitude','unfriendly','not welcoming','dismissive','unprofessional'] },
-    { sub: 'Facility Condition',               keys: ['dirty','not clean','cold','temperature','locker','towel','robe','facility'] },
+    { sub: 'Booking / Scheduling',             keys: ['booking','couldn\'t book','schedule','appointment','no availability','reservation','not available','recovery room','time change','reschedule','rescheduled','miscommunication','timing','appointment time','spa reservations','score 2','score 3','rated 2','rated poor'] },
+    { sub: 'Treatment Quality',                keys: ['treatment','massage','facial','pressure','technique','not good','not what expected','poor quality','rushed','upsell','therapist change','therapist rated','disappointment'] },
+    { sub: 'Staff / Front Desk',               keys: ['rude','cold','attitude','unfriendly','not welcoming','dismissive','unprofessional','overwhelmed','couldn\'t keep up','front desk overwhelmed','spa front desk'] },
+    { sub: 'Pricing',                          keys: ['pricing','price','pricey','too expensive','costly','concern'] },
   ],
 
   'Gym': [
-    { sub: 'Equipment Not Working',            keys: ['broken','not working','out of order','treadmill','elliptical','bike','machine','equipment'] },
-    { sub: 'Cleanliness',                      keys: ['dirty','not clean','debris','towels','wipes','not maintained','smell'] },
-    { sub: 'Entertainment / TV',               keys: ['tv','entertainment','music','no sound','screen','channel','streaming'] },
+    { sub: 'Equipment Not Working',            keys: ['broken','not working','out of order','treadmill','elliptical','bike','machine','equipment','peloton','spin'] },
+    { sub: 'Cleanliness',                      keys: ['dirty','not clean','debris','wipes','not maintained','smell'] },
+    { sub: 'Entertainment / Lighting',         keys: ['tv','entertainment','music','no sound','screen','channel','streaming','dark','too dark','lighting','gym too dark'] },
   ],
 };
 
