@@ -144,6 +144,64 @@ def fetch_all_records():
     return records
 
 
+def infer_department(title: str) -> str:
+    """
+    Best-guess department from Issue Summary when the stored Department is 'Other'.
+    Checks venue/dept keywords in order from most-specific to most-generic.
+    Returns the inferred department name, or 'Other' if nothing matches.
+    """
+    if not title:
+        return "Other"
+    t = title.lower()
+
+    # ── F&B venues (most specific first) ──
+    if "la piscina" in t or "piscina" in t:
+        return "F&B - La Piscina"
+    if "peacock lounge" in t or "pkb" in t:
+        return "F&B - Peacock Lounge"
+    if "peacock" in t:
+        return "F&B - Peacock"
+    if "goldie" in t:
+        return "F&B - Goldie's"
+    if "kappo" in t:
+        return "F&B - Kappo Kappo"
+    if "quill" in t:
+        return "F&B - Quill"
+    if " ird" in t or "in-room dining" in t or "in room dining" in t or "room service" in t:
+        return "F&B - IRD"
+    if any(k in t for k in ["restaurant", "bar ", "dining", "f&b", "food & bev", "menu"]):
+        return "F&B - Peacock"  # generic F&B → main venue
+
+    # ── Other departments ──
+    if "pool" in t:
+        return "Pool"
+    if any(k in t for k in ["spa", "pilates", "massage", "fitness", "gym", "treadmill", "wellness"]):
+        return "Spa"
+    if any(k in t for k in ["valet", "parking", "car retriev"]):
+        return "Valet"
+    if any(k in t for k in ["wifi", "wi-fi", "internet", "it ", "streaming", "tv ", "television"]):
+        return "IT/Systems"
+    if any(k in t for k in [
+        "engineer", "maintenan", "elevator", "hvac", "plumbing",
+        "broken", "repair", "leak", "air condition", "heating", "electrical",
+        "noise", "light bulb", "fixture", "door lock",
+    ]):
+        return "Engineering"
+    if any(k in t for k in [
+        "housekeep", "cleanliness", "clean room", "maid", "turndown",
+        "linen", "towel", "sheet", "dirty",
+    ]):
+        return "Housekeeping"
+    if any(k in t for k in [
+        "front desk", "check-in", "check in", "checkout", "check out",
+        "reservation", "billing", "charge", "key card", "lost", "found",
+        "concierge", "late check", "early check",
+    ]):
+        return "Front Desk"
+
+    return "Other"
+
+
 def parse_record(page):
     p = page.get("properties", {})
 
@@ -169,11 +227,16 @@ def parse_record(page):
         else:
             resolved_cats.append(cat)
 
+    issue_title = title()
+    dept = (p.get("Department", {}).get("select") or {}).get("name")
+    if dept == "Other":
+        dept = infer_department(issue_title)
+
     return {
         "id": page["id"],
-        "issueTitle": title(),
+        "issueTitle": issue_title,
         "issueCategories": resolved_cats,
-        "department": (p.get("Department", {}).get("select") or {}).get("name"),
+        "department": dept,
         "room": txt("Room"),
         "status": (p.get("Status", {}).get("status") or {}).get("name"),
         "date": (p.get("Date", {}).get("date") or {}).get("start"),
