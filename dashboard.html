@@ -1006,33 +1006,29 @@ function drillUrgent(cat, rowEl) {
     return d >= startDate && d <= endDate;
   });
 
-  // Count co-occurring categories (excluding the clicked one itself)
+  // Determine domain of clicked category: physical/facility vs service
+  const clickedIsPhysical = FACILITY_CATS.has(cat) || (PUBLIC_SPACE_MAP[cat] !== undefined);
+
+  // Count same-domain co-occurring categories only
   const subMap = {};
   for (const r of matching) {
     for (const c of (r.cats || [])) {
       if (c === cat) continue;
+      if (isNonActionable(c)) continue;
+      // Only show categories from the same domain
+      const cIsPhysical = FACILITY_CATS.has(c) || (PUBLIC_SPACE_MAP[c] !== undefined);
+      if (cIsPhysical !== clickedIsPhysical) continue;
       subMap[c] = (subMap[c] || 0) + 1;
     }
   }
 
-  // Also count by department
-  const deptMap = {};
-  for (const r of matching) {
-    if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
-  }
-
   const topSubs = Object.entries(subMap)
-    .filter(([c, count]) => count >= 2 && !isNonActionable(c))
+    .filter(([, count]) => count >= 2)
     .map(([c, count]) => ({ c, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  const topDepts = Object.entries(deptMap)
-    .map(([dept, count]) => ({ dept, count }))
-    .sort((a, b) => b.count - a.count);
-
   const maxSub = topSubs.length ? topSubs[0].count : 1;
-  const maxDept = topDepts.length ? topDepts[0].count : 1;
 
   const subRows = topSubs.map(({ c, count }) => `
     <div class="drill-row">
@@ -1041,24 +1037,13 @@ function drillUrgent(cat, rowEl) {
       <span class="drill-cnt">${count}</span>
     </div>`).join('');
 
-  const deptRows = topDepts.map(({ dept, count }) => `
-    <div class="drill-row">
-      <span class="drill-cat">${dept}</span>
-      <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxDept*100).toFixed(1)}%"></div></div>
-      <span class="drill-cnt">${count}</span>
-    </div>`).join('');
-
+  const label = clickedIsPhysical ? 'Related Facility Issues' : 'Related Service Issues';
   panel.innerHTML = `
     <div class="drill-header">
-      <span>Co-occurring Issue Types</span>
-      <span class="drill-total">${matching.length} records total</span>
+      <span>${label}</span>
+      <span class="drill-total">${matching.length} records</span>
     </div>
-    ${topSubs.length ? subRows : '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No co-occurring categories.</div>'}
-    ${topDepts.length ? `
-      <div class="drill-header" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <span>By Department</span>
-      </div>
-      ${deptRows}` : ''}`;
+    ${topSubs.length ? subRows : '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No related sub-categories found.</div>'}`;
   panel.style.display = 'block';
 }
 
