@@ -16,21 +16,21 @@
 
     /* ── Tokens ── */
     :root {
-      --bg:           #0b0b0f;
-      --bg-card:      #111118;
-      --bg-pill:      #1c1c28;
-      --gold:         #c49a3c;
-      --gold-light:   #ddb96a;
-      --gold-dim:     rgba(196,154,60,.18);
-      --gold-faint:   rgba(196,154,60,.07);
-      --gold-border:  rgba(196,154,60,.14);
-      --gold-line:    rgba(196,154,60,.22);
-      --text:         #ede9df;
-      --text-2:       #7a7264;
-      --text-3:       #4a4640;
-      --text-4:       #302e2a;
-      --border:       rgba(255,255,255,.055);
-      --border-card:  rgba(196,154,60,.09);
+      --bg:           #f4f0e8;
+      --bg-card:      #ffffff;
+      --bg-pill:      #ebe6da;
+      --gold:         #a97c2f;
+      --gold-light:   #c49a3c;
+      --gold-dim:     rgba(169,124,47,.10);
+      --gold-faint:   rgba(169,124,47,.05);
+      --gold-border:  rgba(169,124,47,.20);
+      --gold-line:    rgba(169,124,47,.25);
+      --text:         #1a1714;
+      --text-2:       #6b6358;
+      --text-3:       #a09082;
+      --text-4:       #c5bbb0;
+      --border:       rgba(0,0,0,.08);
+      --border-card:  rgba(169,124,47,.13);
       --r:            10px;
       --r-sm:         6px;
     }
@@ -49,9 +49,10 @@
     .app-header {
       position: sticky; top: 0; z-index: 100;
       padding: 0 24px;
-      background: rgba(11,11,15,.94);
+      background: rgba(244,240,232,.97);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--gold-line);
+      box-shadow: 0 1px 12px rgba(0,0,0,.06);
     }
     .header-inner {
       max-width: 1240px; margin: 0 auto;
@@ -130,10 +131,11 @@
     /* ── Section Card ── */
     .card {
       background: var(--bg-card);
-      border: 1px solid var(--border-card);
+      border: 1px solid rgba(0,0,0,.08);
       border-radius: var(--r);
       padding: 26px 28px;
       position: relative; overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
     }
     .card::after {
       content: '';
@@ -198,9 +200,9 @@
     .issue-date { font-size: 12px; color: var(--text-2); }
     .tags { display: flex; flex-wrap: wrap; gap: 4px; }
     .tag {
-      background: rgba(255,255,255,.04); color: var(--text-2);
+      background: rgba(0,0,0,.04); color: var(--text-2);
       font-size: 10.5px; padding: 2px 8px;
-      border-radius: 4px; border: 1px solid rgba(255,255,255,.07);
+      border-radius: 4px; border: 1px solid rgba(0,0,0,.07);
       white-space: nowrap;
     }
     .tag-dim { color: var(--text-3); }
@@ -223,8 +225,8 @@
     .chips { display: flex; flex-wrap: wrap; gap: 3px; }
     .chip {
       font-size: 10px; padding: 2px 6px; border-radius: 3px;
-      background: rgba(255,255,255,.05); color: var(--text-2);
-      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(0,0,0,.04); color: var(--text-2);
+      border: 1px solid rgba(0,0,0,.07);
     }
     .chip-dim { color: var(--text-3); }
 
@@ -232,7 +234,7 @@
     .bar-list { display: flex; flex-direction: column; gap: 9px; }
     .bar-row { display: grid; grid-template-columns: 185px 1fr 38px; align-items: center; gap: 12px; }
     .bar-label { font-size: 13px; color: var(--text); }
-    .bar-track { height: 5px; background: rgba(255,255,255,.05); border-radius: 3px; overflow: hidden; }
+    .bar-track { height: 5px; background: rgba(0,0,0,.07); border-radius: 3px; overflow: hidden; }
     .bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius: 3px; }
     .bar-num { font-size: 13px; font-weight: 600; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -282,7 +284,7 @@
 
     /* ── Period Bar ── */
     .period-bar {
-      background: rgba(11,11,15,.97);
+      background: #ede8de;
       border-bottom: 1px solid var(--border);
       padding: 0 24px;
     }
@@ -826,12 +828,12 @@ function drawChart(monthlyTrend) {
 
   if (trendChart) { trendChart.destroy(); trendChart = null; }
 
-  const gold = '#c49a3c';
+  const gold = '#a97c2f';
   const ctx = canvas.getContext('2d');
 
   const grad = ctx.createLinearGradient(0, 0, 0, 190);
-  grad.addColorStop(0, 'rgba(196,154,60,0.35)');
-  grad.addColorStop(1, 'rgba(196,154,60,0)');
+  grad.addColorStop(0, 'rgba(169,124,47,0.18)');
+  grad.addColorStop(1, 'rgba(169,124,47,0)');
 
   trendChart = new Chart(ctx, {
     type: 'line',
@@ -840,7 +842,7 @@ function drawChart(monthlyTrend) {
       datasets: [{
         data: monthlyTrend.map(m => m.count),
         borderColor: gold,
-        borderWidth: 1.5,
+        borderWidth: 2,
         backgroundColor: grad,
         fill: true,
         tension: 0.35,
@@ -855,11 +857,11 @@ function drawChart(monthlyTrend) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#181820',
-          borderColor: 'rgba(196,154,60,0.2)',
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(169,124,47,0.25)',
           borderWidth: 1,
           titleColor: gold,
-          bodyColor: '#ede9df',
+          bodyColor: '#1a1714',
           padding: 10,
           callbacks: {
             label: ctx => ` ${ctx.parsed.y} issues`
@@ -868,13 +870,13 @@ function drawChart(monthlyTrend) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-          ticks: { color: '#4a4640', font: { size: 11 } },
+          grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false },
+          ticks: { color: '#a09082', font: { size: 11 } },
           border: { display: false }
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-          ticks: { color: '#4a4640', font: { size: 11 }, precision: 0 },
+          grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false },
+          ticks: { color: '#a09082', font: { size: 11 }, precision: 0 },
           border: { display: false }
         }
       }
