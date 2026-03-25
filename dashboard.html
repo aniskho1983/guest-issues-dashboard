@@ -492,6 +492,84 @@ function isNonActionable(cat) {
          t.includes('promoter') || t.includes('recognition');
 }
 
+// ── Issue sub-classifiers (keyword → sub-category, built from real Notion data) ──
+var ISSUE_CLASSIFIERS = {
+
+  'Front Desk Service': [
+    { sub: 'Loyalty / Status Not Recognized',  keys: ['titanium','platinum','ambassador','amex','fhr','marriott','loyalty','points','repeat guest','name not used','name usage','no upgrade','no comp','not acknowledged','acknowledgment','not recognize','no recogni'] },
+    { sub: 'Room Not Ready at Check-in',        keys: ['room not ready','not ready at check','wait for room','waiting for room','bags not in room','30+ min','1 hour wait','2 hour wait','room wait'] },
+    { sub: 'Reservation / Assignment Error',    keys: ['reservation','room type','mismatch','wrong room','room number','room assignment','promo code','rate code','virtuoso','king to double','placed in pq','wrong amenity in room','room mix-up','res mismatch'] },
+    { sub: 'Staff Attitude',                    keys: ['aloof','snobby','rude','cold','flat','annoyed','attitude','below standard','not asked about','not greeted','orientation low','snooty','stuffy','seemed to have cared less','not asked'] },
+    { sub: 'Amenity Not Delivered',             keys: ['amenity not moved','sleep amenity','wine bottle','fruit basket','charger','wrong amenity','not received','not delivered','glasses and charger','amenity delivery','wrong amenity'] },
+    { sub: 'Luggage & Lost Items',              keys: ['luggage','lost & found','lost and found','sunglasses','laptop charger','forgotten item','delivered to wrong','luggage delivery','luggage retrieval','bellman'] },
+    { sub: 'Room View / Type Dissatisfaction',  keys: ['view','garage','pool view','small room','upsell','dressers','storage','too small','room layout','room size','view not acceptable','disliked view','upgrade not','room not satisfy'] },
+    { sub: 'Communication Failure',             keys: ["couldn't reach",'pre-arrival','ai answering','phone system','misrouted','comm gap','not communicated','not informed','canary','ai phone','difficulty reaching','couldn\'t get'] },
+    { sub: 'Noise Complaint',                   keys: ['noise','drilling','drill','loud','barking','dog','leaf blower','elevator noise','music noise','disturbance','sleep disruption','drill noise'] },
+    { sub: 'Billing / Charges',                 keys: ['billing','charge','cc authorized','credit','invoice','gift certificate','rate code','charged','authorized for','payment','$'] },
+  ],
+
+  'Housekeeping Service': [
+    { sub: 'Room Not Cleaned',                  keys: ['dirty','not clean','hair on','room not cleaned','not cleaned','floor','stain','moldy','mould','smelled','funky','soiled'] },
+    { sub: 'Turndown Missed or Late',           keys: ['turndown','not turned','no service','timing','too early','too late','not at all','missed turndown'] },
+    { sub: 'Supplies Not Replenished',          keys: ['replenish','minibar','coffee maker','shower cap','toiletries','body balm','door hanger','missing','not refilled','not restocked','coffee not','supplies'] },
+    { sub: 'Entered Room Without Permission',   keys: ['entered room','despite checkout','entered without','knocked at','checkout knock','disturbed','room despite'] },
+    { sub: 'Item Damaged or Taken',             keys: ['taken by mistake','washcloth','earplugs','iron','threw away','threw out','broken','damaged'] },
+    { sub: 'Incomplete / Missed Service',       keys: ['not serviced','room not serviced','not cleaned properly','service requested','missed','failed to'] },
+  ],
+
+  'Hot Water/HVAC': [
+    { sub: 'No Hot Water',                      keys: ['no hot water','hot water issue','hot water in','lack of hot','not getting hot'] },
+    { sub: 'Temperature Too Cold / Warm',       keys: ['too cold','too warm','too hot','heat not working','room too cold','room too warm','couldn\'t get warm','target temperature','not reaching temp'] },
+    { sub: 'Shower Pressure / Function',        keys: ['shower pressure','water pressure','low pressure','shower not function','shower too hot','shower only warm','lukewarm shower','shower temperature'] },
+    { sub: 'HVAC / A/C Not Working',            keys: ['hvac','a/c not','ac not','thermostat','air condition','ac unit','not cooling','not heating'] },
+  ],
+
+  'Engineering Service': [
+    { sub: 'Plumbing / Water Issues',           keys: ['sink','plumbing','leak','drain','toilet','faucet','shattered','fell apart','cut','water'] },
+    { sub: 'HVAC / Temperature',                keys: ['hvac','a/c','ac','thermostat','heat','temperature','too cold','too warm','air condition'] },
+    { sub: 'Shower / Hot Water',                keys: ['shower','hot water','water pressure','low pressure','lukewarm','no hot','warm not hot'] },
+    { sub: 'In-Room Technology',                keys: ['tv','remote','streaming','wifi','wi-fi','internet','bluetooth','speaker','cable'] },
+    { sub: 'Lighting',                          keys: ['light','lamp','bulb','lighting','lights out','light switch','dark'] },
+    { sub: 'Shades / Windows',                  keys: ['shades','blinds','curtain','window','shade','would not go'] },
+    { sub: 'Door / Lock / Safe',                keys: ['door','lock','safe','locked out','key','deadbolt'] },
+    { sub: 'Elevator',                          keys: ['elevator','lift','stuck in elevator','elevator down','elevator noise'] },
+    { sub: 'Slow Response Time',                keys: ['waited','hours','delay','response time','never came','slow to respond','did not come'] },
+  ],
+
+  'Valet/Parking': [
+    { sub: 'Long Wait Time',                    keys: ['wait time','long wait','delay','delayed','30 min','hour wait','dinner rush','hours instead'] },
+    { sub: 'No Text / Communication Failure',   keys: ['no valet text','no text','couldn\'t reach','miscommunication','contact info','multiple requests','phone delay','couldn\'t request'] },
+    { sub: 'Vehicle Damage / Handling',         keys: ['damage','window','phone holder','vehicle moved','settings changed','music','tesla key','vehicle settings','scratched','dent','car damage'] },
+    { sub: 'Pricing / Charges',                 keys: ['pricing','price','excessive','charge','fee','$65','comped','tip'] },
+    { sub: 'Process / System Issue',            keys: ['online registration','car registration','unclear','system','app','assumes guest','dinner guest','hotel guest'] },
+  ],
+
+  'IRD Service': [
+    { sub: 'Food Quality',                      keys: ['salty','inedible','cold','not tasty','strange flavor','lukewarm','quality','bland','watery','raw','not fresh'] },
+    { sub: 'Wrong or Missing Item',             keys: ['wrong room','missing','incorrect delivery','missing milk','menu mismatch','menu description','not what','wrong order','forgot'] },
+    { sub: 'Slow Delivery',                     keys: ['delay','late','wait','took too long','never arrived','hours','never delivered'] },
+    { sub: 'Order Error',                       keys: ['wrong item','incorrect item','wrong order','delivered wrong','mix-up'] },
+  ],
+
+  'Peacock Service': [
+    { sub: 'Slow Service / Long Wait',          keys: ['slow','wait','took too long','delay','disappeared','gap between','excessive wait','waited','long time','empty tables','service gap','waiter','server','20 minutes'] },
+    { sub: 'Staff Attitude',                    keys: ['stuffy','snooty','not pleasant','rude','snobby','cold','attitude','unprofessional','unsafe'] },
+    { sub: 'Food Quality / Temperature',        keys: ['temperature','raw','salty','watery','strange flavor','cleaning product','inconsistent','not good','overcooked','undercooked','dry','flavor'] },
+    { sub: 'Reservation / Availability',        keys: ['reservation','can\'t get','unable to get','hotel guest','hard to find seating','seating','no availability'] },
+    { sub: 'Specific Dish Issue',               keys: ['pork chop','pancakes','curry','latte','hummus','smoothie','coffee','fettuccine','alfredo','oat latte','foam','dish'] },
+  ],
+};
+
+function classifyIssue(title, primaryCat) {
+  const rules = ISSUE_CLASSIFIERS[primaryCat];
+  if (!rules || !title) return null;
+  const t = title.toLowerCase();
+  for (const { sub, keys } of rules) {
+    if (keys.some(k => t.includes(k))) return sub;
+  }
+  return 'Other';
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 var trendChart = null;
 var allRecords = [];
@@ -1011,53 +1089,79 @@ function drillUrgent(cat, rowEl) {
     return d >= startDate && d <= endDate;
   });
 
-  // ── By Department ──
-  const deptMap = {};
-  for (const r of matching) {
-    if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
+  // ── Try keyword classifier first ──
+  const hasClassifier = !!ISSUE_CLASSIFIERS[cat];
+  let mainHtml = '';
+
+  if (hasClassifier) {
+    const subMap = {};
+    for (const r of matching) {
+      const sub = classifyIssue(r.title || '', cat);
+      if (sub) subMap[sub] = (subMap[sub] || 0) + 1;
+    }
+    const topSubs = Object.entries(subMap)
+      .filter(([s]) => s !== 'Other')
+      .map(([s, count]) => ({ s, count }))
+      .sort((a, b) => b.count - a.count);
+    const otherCount = subMap['Other'] || 0;
+    if (otherCount > 0) topSubs.push({ s: 'Other / Unclassified', count: otherCount });
+
+    const maxSub = topSubs.length ? topSubs[0].count : 1;
+    const subRows = topSubs.map(({ s, count }) => `
+      <div class="drill-row">
+        <span class="drill-cat">${s}</span>
+        <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxSub*100).toFixed(1)}%"></div></div>
+        <span class="drill-cnt">${count}</span>
+      </div>`).join('');
+
+    mainHtml = `
+      <div class="drill-header">
+        <span>Issue Breakdown</span>
+        <span class="drill-total">${matching.length} occurrences</span>
+      </div>
+      ${subRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">Unable to classify issues.</div>'}`;
+
+  } else {
+    // Fallback: by department
+    const deptMap = {};
+    for (const r of matching) {
+      if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + 1;
+    }
+    const topDepts = Object.entries(deptMap).map(([dept, count]) => ({ dept, count })).sort((a, b) => b.count - a.count);
+    const maxDept = topDepts.length ? topDepts[0].count : 1;
+    const deptRows = topDepts.map(({ dept, count }) => `
+      <div class="drill-row">
+        <span class="drill-cat">${dept}</span>
+        <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxDept*100).toFixed(1)}%"></div></div>
+        <span class="drill-cnt">${count}</span>
+      </div>`).join('');
+    mainHtml = `
+      <div class="drill-header">
+        <span>By Department</span>
+        <span class="drill-total">${matching.length} occurrences</span>
+      </div>
+      ${deptRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No department data.</div>'}`;
   }
-  const topDepts = Object.entries(deptMap)
-    .map(([dept, count]) => ({ dept, count }))
-    .sort((a, b) => b.count - a.count);
-  const maxDept = topDepts.length ? topDepts[0].count : 1;
 
-  const deptRows = topDepts.map(({ dept, count }) => `
-    <div class="drill-row">
-      <span class="drill-cat">${dept}</span>
-      <div class="drill-bar-wrap"><div class="drill-bar-fill" style="width:${(count/maxDept*100).toFixed(1)}%"></div></div>
-      <span class="drill-cnt">${count}</span>
-    </div>`).join('');
-
-  // ── 5 most recent examples ──
+  // ── Always show 5 most recent examples ──
   const recent = matching
     .filter(r => r.title && r.title !== '(untitled)')
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 5);
-
   const exampleRows = recent.map(r => {
     const meta = [
       r.dept ? `<span class="imeta-dept">${r.dept}</span>` : null,
       r.room ? `Room ${r.room}` : null,
       fmtDate(r.date)
     ].filter(Boolean).join(' \u00b7 ');
-    return `
-      <div class="incident-row">
-        <div class="incident-title">${r.title}</div>
-        <div class="incident-meta">${meta}</div>
-      </div>`;
+    return `<div class="incident-row"><div class="incident-title">${r.title}</div><div class="incident-meta">${meta}</div></div>`;
   }).join('');
 
-  panel.innerHTML = `
-    <div class="drill-header">
-      <span>By Department</span>
-      <span class="drill-total">${matching.length} occurrences</span>
+  panel.innerHTML = mainHtml + (recent.length ? `
+    <div class="drill-header" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <span>Most Recent Examples</span>
     </div>
-    ${deptRows || '<div style="padding:8px 0;font-size:12px;color:var(--text-3)">No department data.</div>'}
-    ${recent.length ? `
-      <div class="drill-header" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <span>Most Recent Examples</span>
-      </div>
-      ${exampleRows}` : ''}`;
+    ${exampleRows}` : '');
   panel.style.display = 'block';
 }
 
