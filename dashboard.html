@@ -1070,7 +1070,8 @@ function computeSections(records, startDate, endDate) {
     if (!recs.length) return null;
     const lastDate = recs.reduce((best, r) => (!best || r.date > best ? r.date : best), null);
     return { label: entry.label, count: recs.length, lastDate };
-  }).filter(Boolean);
+  }).filter(d => d && d.count >= 2)
+    .sort((a, b) => b.count - a.count);
 
   // ── Facility Issues — top recurring physical/room categories ──
   const facMap = {};
