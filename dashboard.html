@@ -515,7 +515,7 @@ var FACILITY_CATS = new Set([
   "Technology/TV","In-Room Tech Issues","In-Room Technology",
   "Phone System Issues","Technology/Phone System Issues",
   "Room Lighting","Room Comfort and Decor","Room Bedding","Room Amenities",
-  "Bathroom Amenities","Noise Issues","Cleanliness",
+  "Bathroom Amenities","Noise Issues","Cleanliness","Room Size & View",
   "Housekeeping Room Readiness","Room Doesn't Match Expectations"
 ]);
 
@@ -916,6 +916,12 @@ var ISSUE_CLASSIFIERS = {
     { sub: 'Photos / Website Misleading',       keys: ['photos','website','advertised','different than','not like pictures','misrepresented','online photos','not matching','misleading'] },
     { sub: 'Décor / Condition',                 keys: ['dated','old','worn','decor','not modern','condition','needs update','shabby','renovation'] },
   ],
+
+  'Room Size & View': [
+    { sub: 'Room Too Small',       keys: ['too small','room too small','small room','room size','cramped','tiny room','tiny','not enough space','bathroom tiny','smaller than'] },
+    { sub: 'View Disappointing',   keys: ['garage view','parking garage','no view','bad view','disappointing view','limited natural light','pool view','dissatisfied with','not the view'] },
+    { sub: 'Doesn\'t Match Booking', keys: ['suite upgrade','wanted upgrade','mismatch','better view','different room','not what reserved','not what expected','moved to'] },
+  ],
 };
 
 function classifyIssue(title, primaryCat) {
@@ -1074,10 +1080,39 @@ function computeSections(records, startDate, endDate) {
 
   // ── Facility Issues — top recurring physical/room categories ──
   const facMap = {};
+
+  // Title-keyword synthetic categories — catch complaints that are tagged
+  // under a service dept in Notion but are fundamentally room/facility issues.
+  const TITLE_FACILITY_KEYS = [
+    { cat: 'Room Size & View',
+      keys: ['too small','room too small','small room','room size','cramped','tiny room',
+             'garage view','parking garage','no view','bad view','disappointing view',
+             'better view','limited natural light','pool view','dissatisfied with','doesn\'t match'] },
+  ];
+  const titleFacSeen = new Set();
+  for (const r of filtered) {
+    const titleL = (r.title || '').toLowerCase();
+    const rkey = r.date + '|' + (r.title || '');
+    for (const { cat, keys } of TITLE_FACILITY_KEYS) {
+      if (titleFacSeen.has(rkey + cat)) continue;
+      if (keys.some(k => titleL.includes(k))) {
+        titleFacSeen.add(rkey + cat);
+        if (!facMap[cat]) facMap[cat] = { count: 0, lastDate: null };
+        facMap[cat].count++;
+        if (!facMap[cat].lastDate || r.date > facMap[cat].lastDate) facMap[cat].lastDate = r.date;
+      }
+    }
+  }
+
   for (const r of filtered) {
     for (const rawCat of (r.cats || [])) {
       const cat = normalizeCat(rawCat);
       if (catType(cat) !== 'facility') continue;
+      // Don't double-count records already attributed via title scan
+      if (cat === 'Room Doesn\'t Match Expectations') {
+        const rkey = r.date + '|' + (r.title || '') + 'Room Size & View';
+        if (titleFacSeen.has(rkey)) continue;
+      }
       if (!facMap[cat]) facMap[cat] = { count: 0, lastDate: null };
       facMap[cat].count++;
       if (!facMap[cat].lastDate || r.date > facMap[cat].lastDate) facMap[cat].lastDate = r.date;
