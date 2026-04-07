@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -26,41 +27,22 @@ const PERIODS = [
 ];
 
 // ─── Room tooltip filtering ───────────────────────────────────────────────────
-// The room hover tooltip should only show physical room defects — not praise and
-// not service-delivery complaints that happen to have a room number attached.
+// Excludes entries where every Notion category is a pure praise/recognition tag.
+// We rely on category names rather than title keywords — title matching is too
+// risky because words like "love", "satisfied", "pleased" appear in real complaints
+// ("Would love more outlets", "Not satisfied with room temperature").
 
-// Title words that signal a positive / praise entry — exclude entirely
-const PRAISE_TITLE_KEYS = [
-  'great','excellent','amazing','wonderful','love','loved','thank','thanks',
-  'compliment','compliments','praise','recognition','highlight','best','perfect',
-  'fantastic','outstanding','exceptional','incredible','superb','awesome',
-  'well done','appreciated','kudos','shoutout','pleased','satisfied','impressed',
-  'delightful','phenomenal','brilliant','stellar',
-];
-
-// Category names (partial, case-insensitive) that flag a positive / non-actionable entry
 const PRAISE_CAT_SUBS = [
   'recognition','compliment','praise','excellence','highlight','positive feedback',
 ];
 
-// Title words that signal a service-delivery complaint (not a physical room defect).
-// A record can have a room number and still be about slow room service, billing, etc.
-const SERVICE_TITLE_KEYS = [
-  'waited','wait time','slow to respond','no response','never came','did not come',
-  'no one came','no follow','check-in','check-out','check in','check out',
-  'billing','invoice','charge','overcharge','staff was','employee',
-  'front desk','concierge','valet','food was','beverage','restaurant','bar service',
-];
-
-// Returns true only for records that describe a physical room issue
+// Returns false only if ALL categories on the record are praise-type.
+// Records with mixed categories (some praise + some actionable) still show.
+// Records with no categories also show — better to over-include than silently hide.
 function isRoomPhysicalIssue(r) {
-  const t = (r.title || '').toLowerCase();
-  // Exclude positive / praise records
-  if (PRAISE_TITLE_KEYS.some(k => t.includes(k))) return false;
-  if ((r.cats || []).some(c => PRAISE_CAT_SUBS.some(k => c.toLowerCase().includes(k)))) return false;
-  // Exclude service-delivery complaints that aren't about the room itself
-  if (SERVICE_TITLE_KEYS.some(k => t.includes(k))) return false;
-  return true;
+  const cats = (r.cats || []).map(c => c.toLowerCase());
+  if (cats.length === 0) return true; // no categories — keep it
+  return !cats.every(c => PRAISE_CAT_SUBS.some(k => c.includes(k)));
 }
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
@@ -429,8 +411,8 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
         )}
       </SectionCard>
 
-      {/* Floating tooltip — outside the card so it isn't clipped by overflow */}
-      {tooltip && (
+      {/* Tooltip rendered into document.body via portal — bypasses overflow:hidden on section-card */}
+      {tooltip && createPortal(
         <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
           <div className="room-tt-header">Room {tooltip.room} — recent issues</div>
           {tooltip.entries.map((e, i) => (
@@ -444,7 +426,8 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
               </div>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -533,8 +516,8 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
         )}
       </SectionCard>
 
-      {/* Floating tooltip — rendered outside the card so it isn't clipped */}
-      {tooltip && (
+      {/* Tooltip rendered into document.body via portal — bypasses overflow:hidden on section-card */}
+      {tooltip && createPortal(
         <div
           className="dept-tooltip"
           style={{ left: tooltip.x, top: tooltip.y }}
@@ -552,7 +535,8 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
               </div>
             ));
           })()}
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
