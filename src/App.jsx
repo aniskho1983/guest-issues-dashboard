@@ -304,7 +304,18 @@ function UrgentIssues({ issues, lastUpdated, periodLabel }) {
 }
 
 // Section 2 — Room Patterns
+// Shows 6 rooms at a time; each press of "Show more" reveals 6 additional rooms.
+const ROOMS_PER_PAGE = 6;
+
 function RoomPatterns({ rooms, lastUpdated, periodLabel }) {
+  const [visible, setVisible] = useState(ROOMS_PER_PAGE);
+
+  // Reset to 6 whenever the period changes (rooms prop changes)
+  useEffect(() => { setVisible(ROOMS_PER_PAGE); }, [rooms]);
+
+  const shown    = rooms?.slice(0, visible) ?? [];
+  const remaining = (rooms?.length ?? 0) - visible;
+
   return (
     <SectionCard
       title="Recurrent Patterns by Room"
@@ -313,7 +324,7 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel }) {
       isEmpty={!rooms?.length}
     >
       <div className="room-grid">
-        {rooms.map(r => (
+        {shown.map(r => (
           <div key={r.room} className="room-card">
             <div className="room-header">
               <span className="room-number">Room {r.room}</span>
@@ -331,6 +342,18 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel }) {
           </div>
         ))}
       </div>
+
+      {/* Show 6 more rooms per click until all are visible */}
+      {remaining > 0 && (
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <button
+            className="show-more-btn"
+            onClick={() => setVisible(v => v + ROOMS_PER_PAGE)}
+          >
+            Show {Math.min(remaining, ROOMS_PER_PAGE)} more room{Math.min(remaining, ROOMS_PER_PAGE) !== 1 ? 's' : ''} ▼
+          </button>
+        </div>
+      )}
     </SectionCard>
   );
 }
