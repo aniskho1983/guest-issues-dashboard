@@ -305,56 +305,109 @@ function UrgentIssues({ issues, lastUpdated, periodLabel }) {
 
 // Section 2 — Room Patterns
 // Shows 6 rooms at a time; each press of "Show more" reveals 6 additional rooms.
+// Hovering a room card shows the actual issue titles logged for that room in the period.
 const ROOMS_PER_PAGE = 6;
 
-function RoomPatterns({ rooms, lastUpdated, periodLabel }) {
+function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
   const [visible, setVisible] = useState(ROOMS_PER_PAGE);
+  // tooltip: { room, entries: [{title, date, cats}], x, y } | null
+  const [tooltip, setTooltip] = useState(null);
 
   // Reset to 6 whenever the period changes (rooms prop changes)
   useEffect(() => { setVisible(ROOMS_PER_PAGE); }, [rooms]);
 
-  const shown    = rooms?.slice(0, visible) ?? [];
+  const shown     = rooms?.slice(0, visible) ?? [];
   const remaining = (rooms?.length ?? 0) - visible;
 
-  return (
-    <SectionCard
-      title="Recurrent Patterns by Room"
-      subtitle={`Rooms with 2 or more issues — ${periodLabel}`}
-      lastUpdated={lastUpdated}
-      isEmpty={!rooms?.length}
-    >
-      <div className="room-grid">
-        {shown.map(r => (
-          <div key={r.room} className="room-card">
-            <div className="room-header">
-              <span className="room-number">Room {r.room}</span>
-              <span className="room-count">{r.count}×</span>
-            </div>
-            <div className="room-last">Last: {fmtDate(r.lastDate)}</div>
-            <div className="room-cats">
-              {r.issueTypes.slice(0, 4).map(c => (
-                <span key={c} className="cat-chip">{c}</span>
-              ))}
-              {r.issueTypes.length > 4 && (
-                <span className="cat-chip cat-chip-more">+{r.issueTypes.length - 4}</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+  // Fetch the actual issue entries for a room in the current period, most recent first
+  function getRoomEntries(room) {
+    if (!records?.length) return [];
+    const start = getPeriodStart(period);
+    return records
+      .filter(r => r.room === room && new Date(r.date) >= start)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 5); // show up to 5 most recent issues
+  }
 
-      {/* Show 6 more rooms per click until all are visible */}
-      {remaining > 0 && (
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button
-            className="show-more-btn"
-            onClick={() => setVisible(v => v + ROOMS_PER_PAGE)}
-          >
-            Show {Math.min(remaining, ROOMS_PER_PAGE)} more room{Math.min(remaining, ROOMS_PER_PAGE) !== 1 ? 's' : ''} ▼
-          </button>
+  function handleMouseEnter(room, e) {
+    const entries = getRoomEntries(room);
+    if (!entries.length) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Position to the right of the card; fall back to left if near edge
+    const ttW = 300;
+    let x = rect.right + 12;
+    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    setTooltip({ room, entries, x, y: rect.top });
+  }
+
+  function handleMouseLeave() {
+    setTooltip(null);
+  }
+
+  return (
+    <>
+      <SectionCard
+        title="Recurrent Patterns by Room"
+        subtitle={`Rooms with 2 or more issues — ${periodLabel} · Hover for details`}
+        lastUpdated={lastUpdated}
+        isEmpty={!rooms?.length}
+      >
+        <div className="room-grid">
+          {shown.map(r => (
+            <div
+              key={r.room}
+              className="room-card room-card-hoverable"
+              onMouseEnter={e => handleMouseEnter(r.room, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <div className="room-header">
+                <span className="room-number">Room {r.room}</span>
+                <span className="room-count">{r.count}×</span>
+              </div>
+              <div className="room-last">Last: {fmtDate(r.lastDate)}</div>
+              <div className="room-cats">
+                {r.issueTypes.slice(0, 4).map(c => (
+                  <span key={c} className="cat-chip">{c}</span>
+                ))}
+                {r.issueTypes.length > 4 && (
+                  <span className="cat-chip cat-chip-more">+{r.issueTypes.length - 4}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Show 6 more rooms per click until all are visible */}
+        {remaining > 0 && (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              className="show-more-btn"
+              onClick={() => setVisible(v => v + ROOMS_PER_PAGE)}
+            >
+              Show {Math.min(remaining, ROOMS_PER_PAGE)} more room{Math.min(remaining, ROOMS_PER_PAGE) !== 1 ? 's' : ''} ▼
+            </button>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Floating tooltip — outside the card so it isn't clipped by overflow */}
+      {tooltip && (
+        <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
+          <div className="room-tt-header">Room {tooltip.room} — recent issues</div>
+          {tooltip.entries.map((e, i) => (
+            <div key={i} className="room-tt-entry">
+              <div className="room-tt-title">{e.title}</div>
+              <div className="room-tt-meta">
+                {fmtDate(e.date)}
+                {e.cats?.length > 0 && (
+                  <span className="room-tt-cats"> · {e.cats.slice(0, 2).join(', ')}</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
-    </SectionCard>
+    </>
   );
 }
 
@@ -649,6 +702,8 @@ export default function App() {
                 rooms={metrics.roomPatterns}
                 lastUpdated={data.lastUpdated}
                 periodLabel={periodLabel}
+                records={data.records}
+                period={period}
               />
               <VenuePatterns
                 venues={metrics.venuePatterns}
