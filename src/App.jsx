@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -328,8 +328,20 @@ function SectionCard({ title, subtitle, lastUpdated, isEmpty, children }) {
 // Hovering a row shows a department breakdown — occurrences of that category
 // per department, sorted highest first, as a mini bar chart.
 function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
-  // tooltip: { category, total, depts: [{dept, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
+  const hoverElRef = useRef(null); // tracks the currently hovered row element
+
+  // Keep tooltip vertically aligned with its row as the page scrolls
+  useEffect(() => {
+    function onScroll() {
+      if (!hoverElRef.current) return;
+      const rect = hoverElRef.current.getBoundingClientRect();
+      const y = Math.min(rect.top, window.innerHeight - 320);
+      setTooltip(prev => prev ? { ...prev, y } : null);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Get issue details for the tooltip.
   // One entry per guest session (date + room/dept) — matches the occurrence
@@ -365,16 +377,15 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
   function handleMouseEnter(category, e) {
     const { total, titles } = getIssueDetails(category);
     if (!total) return;
+    hoverElRef.current = e.currentTarget;
     const rect = e.currentTarget.getBoundingClientRect();
-    const ttW  = 320;
-    // Always anchor to the right edge of the viewport — the table rows are full-width
-    // so rect.right is always near the screen edge, which would flip the tooltip left
-    const x = window.innerWidth - ttW - 16;
+    const x = window.innerWidth - 320 - 16;
     const y = Math.min(rect.top, window.innerHeight - 320);
     setTooltip({ category, total, titles, x, y });
   }
 
   function handleMouseLeave() {
+    hoverElRef.current = null;
     setTooltip(null);
   }
 
@@ -449,11 +460,26 @@ const ROOMS_PER_PAGE = 6;
 
 function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
   const [visible, setVisible] = useState(ROOMS_PER_PAGE);
-  // tooltip: { room, total, cats: [{cat, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
+  const hoverElRef = useRef(null);
 
   // Reset to 6 whenever the period changes
   useEffect(() => { setVisible(ROOMS_PER_PAGE); }, [rooms]);
+
+  // Keep tooltip aligned with its card as the page scrolls
+  useEffect(() => {
+    function onScroll() {
+      if (!hoverElRef.current) return;
+      const rect = hoverElRef.current.getBoundingClientRect();
+      const ttW = 280;
+      let x = rect.right + 12;
+      if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+      const y = Math.min(rect.top, window.innerHeight - 260);
+      setTooltip(prev => prev ? { ...prev, x, y } : null);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const shown     = rooms?.slice(0, visible) ?? [];
   const remaining = (rooms?.length ?? 0) - visible;
@@ -511,17 +537,18 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
 
   function handleMouseEnter(room, e) {
     const { total, cats } = getRoomFacilityCats(room);
-    if (!total) return; // room has no records in this period — nothing to show
+    if (!total) return;
+    hoverElRef.current = e.currentTarget;
     const rect = e.currentTarget.getBoundingClientRect();
     const ttW  = 280;
     let x = rect.right + 12;
     if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
-    // Clamp vertically so tooltip doesn't run off the bottom of the viewport
     const y = Math.min(rect.top, window.innerHeight - 260);
     setTooltip({ room, total, cats, x, y });
   }
 
   function handleMouseLeave() {
+    hoverElRef.current = null;
     setTooltip(null);
   }
 
@@ -604,8 +631,22 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
 function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
   const VISIBLE = 6;
   const [expanded, setExpanded] = useState(false);
-  // tooltip: { dept, cats: [{cat,count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
+  const hoverElRef = useRef(null);
+
+  // Keep tooltip aligned with its row as the page scrolls
+  useEffect(() => {
+    function onScroll() {
+      if (!hoverElRef.current) return;
+      const rect = hoverElRef.current.getBoundingClientRect();
+      const ttW = 290;
+      let x = rect.right + 12;
+      if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+      setTooltip(prev => prev ? { ...prev, x, y: rect.top } : null);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const max = Math.max(...(depts?.map(d => d.count) ?? [1]), 1);
   const visible = expanded ? depts : depts?.slice(0, VISIBLE);
@@ -643,8 +684,8 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
   function handleMouseEnter(dept, e) {
     const cats = getTopCats(dept);
     if (!cats.length) return;
+    hoverElRef.current = e.currentTarget;
     const rect = e.currentTarget.getBoundingClientRect();
-    // Position to the right; fall back to left if near screen edge
     const ttW = 290;
     let x = rect.right + 12;
     if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
@@ -652,6 +693,7 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
   }
 
   function handleMouseLeave() {
+    hoverElRef.current = null;
     setTooltip(null);
   }
 
