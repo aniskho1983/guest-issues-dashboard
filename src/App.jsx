@@ -335,8 +335,9 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
     if (!total) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ttW  = 320;
-    let x = rect.right + 12;
-    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    // Always anchor to the right edge of the viewport — the table rows are full-width
+    // so rect.right is always near the screen edge, which would flip the tooltip left
+    const x = window.innerWidth - ttW - 16;
     const y = Math.min(rect.top, window.innerHeight - 320);
     setTooltip({ category, total, titles, x, y });
   }
