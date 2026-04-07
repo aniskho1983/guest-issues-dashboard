@@ -300,40 +300,115 @@ function SectionCard({ title, subtitle, lastUpdated, isEmpty, children }) {
 }
 
 // Section 1 — Top Urgent Issues
-function UrgentIssues({ issues, lastUpdated, periodLabel }) {
+// Hovering a row shows a department breakdown — occurrences of that category
+// per department, sorted highest first, as a mini bar chart.
+function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
+  // tooltip: { category, total, depts: [{dept, count}], x, y } | null
+  const [tooltip, setTooltip] = useState(null);
+
+  // Count how many times a category appears per department in the current period
+  function getDeptBreakdown(category) {
+    if (!records?.length) return { total: 0, depts: [] };
+    const start = getPeriodStart(period);
+
+    const deptMap = {};
+    let total = 0;
+    records
+      .filter(r => {
+        const d = new Date(r.date);
+        return d >= start && (r.cats || []).includes(category);
+      })
+      .forEach(r => {
+        total++;
+        const dept = r.dept || 'Unknown';
+        deptMap[dept] = (deptMap[dept] || 0) + 1;
+      });
+
+    const depts = Object.entries(deptMap)
+      .map(([dept, count]) => ({ dept, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { total, depts };
+  }
+
+  function handleMouseEnter(category, e) {
+    const { total, depts } = getDeptBreakdown(category);
+    if (!total) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ttW  = 280;
+    let x = rect.right + 12;
+    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    const y = Math.min(rect.top, window.innerHeight - 280);
+    setTooltip({ category, total, depts, x, y });
+  }
+
+  function handleMouseLeave() {
+    setTooltip(null);
+  }
+
   return (
-    <SectionCard
-      title={`Top Urgent Issues — ${periodLabel}`}
-      subtitle="Ranked by pattern frequency + recency · Minimum occurrences threshold scales with period"
-      lastUpdated={lastUpdated}
-      isEmpty={!issues?.length}
-    >
-      <div className="urgent-table">
-        <div className="table-head">
-          <span>#</span>
-          <span>Issue Category</span>
-          <span>Occurrences</span>
-          <span>Last Seen</span>
-          <span>Departments Affected</span>
-        </div>
-        {issues.map((issue, i) => (
-          <div key={issue.category} className={`table-row rank-${i + 1}`}>
-            <span className="rank-badge">{i + 1}</span>
-            <span className="issue-name">{issue.category}</span>
-            <span className="count-cell"><span className="count-pill">{issue.count}</span></span>
-            <span className="issue-date">{daysAgoLabel(issue.lastOccurrence)}</span>
-            <span className="dept-tags">
-              {issue.departments.slice(0, 3).map(d => (
-                <span key={d} className="dept-tag">{d}</span>
-              ))}
-              {issue.departments.length > 3 && (
-                <span className="dept-tag dept-tag-more">+{issue.departments.length - 3}</span>
-              )}
-            </span>
+    <>
+      <SectionCard
+        title={`Top Urgent Issues — ${periodLabel}`}
+        subtitle="Ranked by pattern frequency + recency · Hover for department breakdown"
+        lastUpdated={lastUpdated}
+        isEmpty={!issues?.length}
+      >
+        <div className="urgent-table">
+          <div className="table-head">
+            <span>#</span>
+            <span>Issue Category</span>
+            <span>Occurrences</span>
+            <span>Last Seen</span>
+            <span>Departments Affected</span>
           </div>
-        ))}
-      </div>
-    </SectionCard>
+          {issues.map((issue, i) => (
+            <div
+              key={issue.category}
+              className={`table-row rank-${i + 1}`}
+              onMouseEnter={e => handleMouseEnter(issue.category, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <span className="rank-badge">{i + 1}</span>
+              <span className="issue-name">{issue.category}</span>
+              <span className="count-cell"><span className="count-pill">{issue.count}</span></span>
+              <span className="issue-date">{daysAgoLabel(issue.lastOccurrence)}</span>
+              <span className="dept-tags">
+                {issue.departments.slice(0, 3).map(d => (
+                  <span key={d} className="dept-tag">{d}</span>
+                ))}
+                {issue.departments.length > 3 && (
+                  <span className="dept-tag dept-tag-more">+{issue.departments.length - 3}</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Portal into body — escapes overflow:hidden on section-card */}
+      {tooltip && createPortal(
+        <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
+          <div className="room-tt-header">
+            {tooltip.category}
+            <span className="room-tt-total">{tooltip.total} occurrence{tooltip.total !== 1 ? 's' : ''}</span>
+          </div>
+          {(() => {
+            const max = tooltip.depts[0]?.count || 1;
+            return tooltip.depts.map(({ dept, count }) => (
+              <div key={dept} className="room-tt-row">
+                <span className="room-tt-label">{dept}</span>
+                <div className="room-tt-bar-wrap">
+                  <div className="room-tt-bar-fill" style={{ width: `${(count / max) * 100}%` }} />
+                </div>
+                <span className="room-tt-cnt">{count}</span>
+              </div>
+            ));
+          })()}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -769,6 +844,8 @@ export default function App() {
               issues={metrics.urgentIssues}
               lastUpdated={data.lastUpdated}
               periodLabel={periodLabel}
+              records={data.records}
+              period={period}
             />
 
             <div className="two-col">
