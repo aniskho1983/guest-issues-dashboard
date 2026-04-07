@@ -331,8 +331,9 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
   // tooltip: { category, total, depts: [{dept, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
 
-  // Get issue details for the tooltip — deduplicated by session (same guest rule)
-  // and filtered to exclude positive/praise categories.
+  // Get issue details for the tooltip.
+  // One entry per guest session (date + room/dept) — matches the occurrence
+  // counting rule in computeMetrics. Positive-only records are skipped.
   function getIssueDetails(category) {
     if (!records?.length) return { total: 0, titles: [] };
     const start = getPeriodStart(period);
@@ -341,28 +342,24 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
       .filter(r => new Date(r.date) >= start && (r.cats || []).includes(category))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Count unique sessions (same logic as computeMetrics)
-    const sessionSet = new Set(
-      matching.map(r => r.date + '|' + (r.room || r.dept || 'unknown'))
-    );
-    const total = sessionSet.size;
-
-    // Show unique titles — one per distinct complaint, skip praise-only records
-    const seen = new Set();
-    const titles = [];
+    // Build one entry per session — first record encountered for that session wins
+    const sessionMap = new Map();
     for (const r of matching) {
-      // Skip records where every category is positive
       const negativeCats = (r.cats || []).filter(c => !isPositiveCat(c));
-      if (negativeCats.length === 0) continue;
-      const t = (r.title || '').trim();
-      if (t && t !== '(untitled)' && !seen.has(t)) {
-        seen.add(t);
-        titles.push({ title: t, date: r.date, dept: r.dept, room: r.room });
-        if (titles.length === 6) break;
+      if (negativeCats.length === 0) continue; // skip pure praise records
+      const key = r.date + '|' + (r.room || r.dept || 'unknown');
+      if (!sessionMap.has(key)) {
+        sessionMap.set(key, {
+          title: (r.title || '').trim() || '(no summary)',
+          date:  r.date,
+          dept:  r.dept,
+          room:  r.room,
+        });
       }
     }
 
-    return { total, titles };
+    const titles = [...sessionMap.values()].slice(0, 6);
+    return { total: sessionMap.size, titles };
   }
 
   function handleMouseEnter(category, e) {
@@ -473,11 +470,21 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
     );
     if (!roomRecords.length) return { total: 0, cats: [] };
 
-    // Count every category across those records
+    // Group records by session date — same room same day = same guest
+    // Each session contributes at most 1 count per category (no double-counting)
+    const sessionCats = new Map(); // date -> Set of negative categories
+    roomRecords.forEach(r => {
+      if (!sessionCats.has(r.date)) sessionCats.set(r.date, new Set());
+      (r.cats || [])
+        .filter(c => !isPositiveCat(c))
+        .forEach(c => sessionCats.get(r.date).add(c));
+    });
+
+    // Count how many sessions included each category
     const catMap = {};
-    roomRecords.forEach(r =>
-      (r.cats || []).forEach(cat => { catMap[cat] = (catMap[cat] || 0) + 1; })
-    );
+    for (const cats of sessionCats.values()) {
+      cats.forEach(cat => { catMap[cat] = (catMap[cat] || 0) + 1; });
+    }
 
     // Keep only facility/room-related categories using keyword matching
     const facilityCats = Object.entries(catMap)
@@ -496,10 +503,10 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
         .map(([cat, count]) => ({ cat, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 6);
-      return { total: roomRecords.length, cats: allCats };
+      return { total: sessionCats.size, cats: allCats };
     }
 
-    return { total: roomRecords.length, cats: facilityCats };
+    return { total: sessionCats.size, cats: facilityCats };
   }
 
   function handleMouseEnter(room, e) {
@@ -604,16 +611,29 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
   const visible = expanded ? depts : depts?.slice(0, VISIBLE);
   const hiddenCount = (depts?.length ?? 0) - VISIBLE;
 
-  // Compute top issue categories for a dept in the current period (for the hover tooltip)
+  // Compute top issue categories for a dept — one count per guest session,
+  // positive/praise categories excluded.
   function getTopCats(dept) {
     if (!records?.length) return [];
     const start = getPeriodStart(period);
-    const catMap = {};
+
+    // Group by session (date + room/dept key) — same guest = one count per category
+    const sessionCats = new Map();
     records
       .filter(r => r.dept === dept && new Date(r.date) >= start)
-      .forEach(r => (r.cats || []).forEach(cat => {
-        catMap[cat] = (catMap[cat] || 0) + 1;
-      }));
+      .forEach(r => {
+        const key = r.date + '|' + (r.room || r.dept || 'unknown');
+        if (!sessionCats.has(key)) sessionCats.set(key, new Set());
+        (r.cats || [])
+          .filter(c => !isPositiveCat(c))
+          .forEach(c => sessionCats.get(key).add(c));
+      });
+
+    const catMap = {};
+    for (const cats of sessionCats.values()) {
+      cats.forEach(cat => { catMap[cat] = (catMap[cat] || 0) + 1; });
+    }
+
     return Object.entries(catMap)
       .map(([cat, count]) => ({ cat, count }))
       .sort((a, b) => b.count - a.count)
