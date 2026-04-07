@@ -25,6 +25,44 @@ const PERIODS = [
   { key: 'ytd', label: 'YTD' },
 ];
 
+// ─── Room tooltip filtering ───────────────────────────────────────────────────
+// The room hover tooltip should only show physical room defects — not praise and
+// not service-delivery complaints that happen to have a room number attached.
+
+// Title words that signal a positive / praise entry — exclude entirely
+const PRAISE_TITLE_KEYS = [
+  'great','excellent','amazing','wonderful','love','loved','thank','thanks',
+  'compliment','compliments','praise','recognition','highlight','best','perfect',
+  'fantastic','outstanding','exceptional','incredible','superb','awesome',
+  'well done','appreciated','kudos','shoutout','pleased','satisfied','impressed',
+  'delightful','phenomenal','brilliant','stellar',
+];
+
+// Category names (partial, case-insensitive) that flag a positive / non-actionable entry
+const PRAISE_CAT_SUBS = [
+  'recognition','compliment','praise','excellence','highlight','positive feedback',
+];
+
+// Title words that signal a service-delivery complaint (not a physical room defect).
+// A record can have a room number and still be about slow room service, billing, etc.
+const SERVICE_TITLE_KEYS = [
+  'waited','wait time','slow to respond','no response','never came','did not come',
+  'no one came','no follow','check-in','check-out','check in','check out',
+  'billing','invoice','charge','overcharge','staff was','employee',
+  'front desk','concierge','valet','food was','beverage','restaurant','bar service',
+];
+
+// Returns true only for records that describe a physical room issue
+function isRoomPhysicalIssue(r) {
+  const t = (r.title || '').toLowerCase();
+  // Exclude positive / praise records
+  if (PRAISE_TITLE_KEYS.some(k => t.includes(k))) return false;
+  if ((r.cats || []).some(c => PRAISE_CAT_SUBS.some(k => c.toLowerCase().includes(k)))) return false;
+  // Exclude service-delivery complaints that aren't about the room itself
+  if (SERVICE_TITLE_KEYS.some(k => t.includes(k))) return false;
+  return true;
+}
+
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
 // Returns the cutoff Date for a given period key
@@ -319,14 +357,15 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
   const shown     = rooms?.slice(0, visible) ?? [];
   const remaining = (rooms?.length ?? 0) - visible;
 
-  // Fetch the actual issue entries for a room in the current period, most recent first
+  // Fetch physical room issue entries for a room in the current period, most recent first.
+  // Filters out praise/positive records and service-delivery complaints.
   function getRoomEntries(room) {
     if (!records?.length) return [];
     const start = getPeriodStart(period);
     return records
-      .filter(r => r.room === room && new Date(r.date) >= start)
+      .filter(r => r.room === room && new Date(r.date) >= start && isRoomPhysicalIssue(r))
       .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5); // show up to 5 most recent issues
+      .slice(0, 5);
   }
 
   function handleMouseEnter(room, e) {
