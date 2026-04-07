@@ -26,6 +26,20 @@ const PERIODS = [
   { key: 'ytd', label: 'YTD' },
 ];
 
+// ─── Positive category filter ─────────────────────────────────────────────────
+// Categories that represent praise or recognition — excluded from all issue counts
+// and breakdowns across the entire dashboard.
+const POSITIVE_CAT_SUBS = [
+  'recognition','compliment','praise','excellence','highlight',
+  'positive feedback','positive','kudos','shoutout','commend',
+  'appreciation','thank','well done','great job','outstanding service',
+];
+
+function isPositiveCat(cat) {
+  const c = cat.toLowerCase();
+  return POSITIVE_CAT_SUBS.some(k => c.includes(k));
+}
+
 // ─── Room facility category filtering ────────────────────────────────────────
 // Used by the room hover tooltip to show only physical/facility issue categories.
 // Matches against Notion multi-select category names (case-insensitive substring).
@@ -98,28 +112,39 @@ function computeMetrics(records, period) {
   const periodDays = (now - start) / 86400000 || 1;
 
   // ── Urgent Issues ─────────────────────────────────────────────────────────
-  // Ranked by a composite score: 60% frequency weight + 40% recency weight
+  // Ranked by a composite score: 60% frequency weight + 40% recency weight.
+  //
+  // Occurrence counting rules:
+  //   1. Positive/praise categories are skipped entirely.
+  //   2. One guest filing multiple records on the same day counts as ONE
+  //      occurrence. A "session" is (date + room) when a room is present,
+  //      or (date + dept) otherwise — so the valet guest on Apr 6 who
+  //      generated 3 records all counts as a single valet occurrence.
   const catMap = {};
   filtered.forEach(r => {
+    // Unique key representing one guest interaction
+    const sessionKey = r.date + '|' + (r.room || r.dept || 'unknown');
     (r.cats || []).forEach(cat => {
-      if (!catMap[cat]) catMap[cat] = { count: 0, lastDate: null, depts: new Set() };
-      catMap[cat].count++;
+      if (isPositiveCat(cat)) return; // skip praise/recognition
+      if (!catMap[cat]) catMap[cat] = { sessions: new Set(), lastDate: null, depts: new Set() };
+      catMap[cat].sessions.add(sessionKey);
       if (!catMap[cat].lastDate || r.date > catMap[cat].lastDate) catMap[cat].lastDate = r.date;
       if (r.dept) catMap[cat].depts.add(r.dept);
     });
   });
 
-  const maxCatCount = Math.max(...Object.values(catMap).map(v => v.count), 1);
+  const maxCatCount = Math.max(...Object.values(catMap).map(v => v.sessions.size), 1);
 
   const urgentIssues = Object.entries(catMap)
-    .filter(([, v]) => v.count >= minOcc)
+    .filter(([, v]) => v.sessions.size >= minOcc)
     .map(([cat, v]) => {
+      const count        = v.sessions.size;
       const daysSince    = (now - new Date(v.lastDate)) / 86400000;
       const recencyScore = Math.max(0, 1 - daysSince / periodDays);
-      const score        = (v.count / maxCatCount) * 0.6 + recencyScore * 0.4;
+      const score        = (count / maxCatCount) * 0.6 + recencyScore * 0.4;
       return {
         category:       cat,
-        count:          v.count,
+        count,
         lastOccurrence: v.lastDate,
         departments:    [...v.depts],
         score:          Math.round(score * 100) / 100,
@@ -306,7 +331,8 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
   // tooltip: { category, total, depts: [{dept, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
 
-  // Get the most recent issue titles logged under this category in the current period
+  // Get issue details for the tooltip — deduplicated by session (same guest rule)
+  // and filtered to exclude positive/praise categories.
   function getIssueDetails(category) {
     if (!records?.length) return { total: 0, titles: [] };
     const start = getPeriodStart(period);
@@ -315,10 +341,19 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
       .filter(r => new Date(r.date) >= start && (r.cats || []).includes(category))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Deduplicate by title — show unique complaints, not the same line repeated
+    // Count unique sessions (same logic as computeMetrics)
+    const sessionSet = new Set(
+      matching.map(r => r.date + '|' + (r.room || r.dept || 'unknown'))
+    );
+    const total = sessionSet.size;
+
+    // Show unique titles — one per distinct complaint, skip praise-only records
     const seen = new Set();
     const titles = [];
     for (const r of matching) {
+      // Skip records where every category is positive
+      const negativeCats = (r.cats || []).filter(c => !isPositiveCat(c));
+      if (negativeCats.length === 0) continue;
       const t = (r.title || '').trim();
       if (t && t !== '(untitled)' && !seen.has(t)) {
         seen.add(t);
@@ -327,7 +362,7 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
       }
     }
 
-    return { total: matching.length, titles };
+    return { total, titles };
   }
 
   function handleMouseEnter(category, e) {
