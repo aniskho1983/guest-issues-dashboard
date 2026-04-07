@@ -306,40 +306,39 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
   // tooltip: { category, total, depts: [{dept, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
 
-  // Count how many times a category appears per department in the current period
-  function getDeptBreakdown(category) {
-    if (!records?.length) return { total: 0, depts: [] };
+  // Get the most recent issue titles logged under this category in the current period
+  function getIssueDetails(category) {
+    if (!records?.length) return { total: 0, titles: [] };
     const start = getPeriodStart(period);
 
-    const deptMap = {};
-    let total = 0;
-    records
-      .filter(r => {
-        const d = new Date(r.date);
-        return d >= start && (r.cats || []).includes(category);
-      })
-      .forEach(r => {
-        total++;
-        const dept = r.dept || 'Unknown';
-        deptMap[dept] = (deptMap[dept] || 0) + 1;
-      });
+    const matching = records
+      .filter(r => new Date(r.date) >= start && (r.cats || []).includes(category))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const depts = Object.entries(deptMap)
-      .map(([dept, count]) => ({ dept, count }))
-      .sort((a, b) => b.count - a.count);
+    // Deduplicate by title — show unique complaints, not the same line repeated
+    const seen = new Set();
+    const titles = [];
+    for (const r of matching) {
+      const t = (r.title || '').trim();
+      if (t && t !== '(untitled)' && !seen.has(t)) {
+        seen.add(t);
+        titles.push({ title: t, date: r.date, dept: r.dept });
+        if (titles.length === 6) break;
+      }
+    }
 
-    return { total, depts };
+    return { total: matching.length, titles };
   }
 
   function handleMouseEnter(category, e) {
-    const { total, depts } = getDeptBreakdown(category);
+    const { total, titles } = getIssueDetails(category);
     if (!total) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const ttW  = 280;
+    const ttW  = 320;
     let x = rect.right + 12;
     if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
-    const y = Math.min(rect.top, window.innerHeight - 280);
-    setTooltip({ category, total, depts, x, y });
+    const y = Math.min(rect.top, window.innerHeight - 320);
+    setTooltip({ category, total, titles, x, y });
   }
 
   function handleMouseLeave() {
@@ -388,23 +387,21 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
 
       {/* Portal into body — escapes overflow:hidden on section-card */}
       {tooltip && createPortal(
-        <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
-          <div className="room-tt-header">
+        <div className="urgent-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
+          <div className="urgent-tt-header">
             {tooltip.category}
-            <span className="room-tt-total">{tooltip.total} occurrence{tooltip.total !== 1 ? 's' : ''}</span>
+            <span className="urgent-tt-total">{tooltip.total}× in period</span>
           </div>
-          {(() => {
-            const max = tooltip.depts[0]?.count || 1;
-            return tooltip.depts.map(({ dept, count }) => (
-              <div key={dept} className="room-tt-row">
-                <span className="room-tt-label">{dept}</span>
-                <div className="room-tt-bar-wrap">
-                  <div className="room-tt-bar-fill" style={{ width: `${(count / max) * 100}%` }} />
-                </div>
-                <span className="room-tt-cnt">{count}</span>
+          {tooltip.titles.length > 0 ? tooltip.titles.map(({ title, date, dept }, i) => (
+            <div key={i} className="urgent-tt-entry">
+              <div className="urgent-tt-title">{title}</div>
+              <div className="urgent-tt-meta">
+                {fmtDate(date)}{dept ? ` · ${dept}` : ''}
               </div>
-            ));
-          })()}
+            </div>
+          )) : (
+            <div className="urgent-tt-empty">No issue details available</div>
+          )}
         </div>,
         document.body
       )}
