@@ -440,6 +440,55 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Subtle hover highlight on department rows */
+.dept-row-hoverable { cursor: default; border-radius: var(--radius-xs); transition: background 0.15s; }
+.dept-row-hoverable:hover { background: var(--bg-hover); }
+
+/* Show more / fewer toggle button */
+.show-more-btn {
+  background: none;
+  border: 1px solid var(--gold-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.show-more-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Floating hover tooltip for department rows */
+.dept-tooltip {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg-card);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  width: 290px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  pointer-events: none; /* never blocks the row underneath */
+}
+.dept-tt-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.dept-tt-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 26px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.dept-tt-label { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dept-tt-bar-wrap { height: 4px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+.dept-tt-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; }
+.dept-tt-cnt { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-align: right; }
+
 /* ─── Section 4: Venue Patterns ─────────────────────────────────────────── */
 .venue-grid {
   display: grid;

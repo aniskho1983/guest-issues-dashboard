@@ -336,30 +336,110 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel }) {
 }
 
 // Section 3 — Department Patterns
-function DeptPatterns({ depts, lastUpdated, periodLabel }) {
+// Accepts `records` + `period` so it can compute per-dept category breakdowns on hover.
+function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
+  const VISIBLE = 6;
+  const [expanded, setExpanded] = useState(false);
+  // tooltip: { dept, cats: [{cat,count}], x, y } | null
+  const [tooltip, setTooltip] = useState(null);
+
   const max = Math.max(...(depts?.map(d => d.count) ?? [1]), 1);
+  const visible = expanded ? depts : depts?.slice(0, VISIBLE);
+  const hiddenCount = (depts?.length ?? 0) - VISIBLE;
+
+  // Compute top issue categories for a dept in the current period (for the hover tooltip)
+  function getTopCats(dept) {
+    if (!records?.length) return [];
+    const start = getPeriodStart(period);
+    const catMap = {};
+    records
+      .filter(r => r.dept === dept && new Date(r.date) >= start)
+      .forEach(r => (r.cats || []).forEach(cat => {
+        catMap[cat] = (catMap[cat] || 0) + 1;
+      }));
+    return Object.entries(catMap)
+      .map(([cat, count]) => ({ cat, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }
+
+  function handleMouseEnter(dept, e) {
+    const cats = getTopCats(dept);
+    if (!cats.length) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Position to the right; fall back to left if near screen edge
+    const ttW = 290;
+    let x = rect.right + 12;
+    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    setTooltip({ dept, cats, x, y: rect.top });
+  }
+
+  function handleMouseLeave() {
+    setTooltip(null);
+  }
+
   return (
-    <SectionCard
-      title="Recurrent Patterns by Department"
-      subtitle={`Issue volume ranked by department — ${periodLabel}`}
-      lastUpdated={lastUpdated}
-      isEmpty={!depts?.length}
-    >
-      <div className="bar-list">
-        {depts.map((d, i) => (
-          <div key={d.dept} className="bar-row">
-            <span className="bar-label">{d.dept}</span>
-            <div className="bar-track">
-              <div
-                className="bar-fill"
-                style={{ width: `${(d.count / max) * 100}%`, opacity: Math.max(0.35, 1 - i * 0.055) }}
-              />
+    <>
+      <SectionCard
+        title="Recurrent Patterns by Department"
+        subtitle={`Issue volume ranked by department — ${periodLabel} · Hover for breakdown`}
+        lastUpdated={lastUpdated}
+        isEmpty={!depts?.length}
+      >
+        <div className="bar-list">
+          {visible.map((d, i) => (
+            <div
+              key={d.dept}
+              className="bar-row dept-row-hoverable"
+              onMouseEnter={e => handleMouseEnter(d.dept, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <span className="bar-label">{d.dept}</span>
+              <div className="bar-track">
+                <div
+                  className="bar-fill"
+                  style={{ width: `${(d.count / max) * 100}%`, opacity: Math.max(0.35, 1 - i * 0.055) }}
+                />
+              </div>
+              <span className="bar-count">{d.count}</span>
             </div>
-            <span className="bar-count">{d.count}</span>
+          ))}
+        </div>
+
+        {/* Show more / show fewer toggle — only rendered when there are > 6 depts */}
+        {hiddenCount > 0 && (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button className="show-more-btn" onClick={() => setExpanded(v => !v)}>
+              {expanded
+                ? '▲ Show fewer'
+                : `Show ${hiddenCount} more department${hiddenCount !== 1 ? 's' : ''} ▼`}
+            </button>
           </div>
-        ))}
-      </div>
-    </SectionCard>
+        )}
+      </SectionCard>
+
+      {/* Floating tooltip — rendered outside the card so it isn't clipped */}
+      {tooltip && (
+        <div
+          className="dept-tooltip"
+          style={{ left: tooltip.x, top: tooltip.y }}
+        >
+          <div className="dept-tt-header">{tooltip.dept}</div>
+          {(() => {
+            const maxCat = tooltip.cats[0].count;
+            return tooltip.cats.map(({ cat, count }) => (
+              <div key={cat} className="dept-tt-row">
+                <span className="dept-tt-label">{cat}</span>
+                <div className="dept-tt-bar-wrap">
+                  <div className="dept-tt-bar-fill" style={{ width: `${(count / maxCat) * 100}%` }} />
+                </div>
+                <span className="dept-tt-cnt">{count}</span>
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -558,6 +638,8 @@ export default function App() {
               depts={metrics.deptPatterns}
               lastUpdated={data.lastUpdated}
               periodLabel={periodLabel}
+              records={data.records}
+              period={period}
             />
 
             <YTDSummary ytd={ytd} lastUpdated={data.lastUpdated} />
