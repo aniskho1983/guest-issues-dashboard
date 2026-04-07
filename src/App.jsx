@@ -357,7 +357,7 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
       const t = (r.title || '').trim();
       if (t && t !== '(untitled)' && !seen.has(t)) {
         seen.add(t);
-        titles.push({ title: t, date: r.date, dept: r.dept });
+        titles.push({ title: t, date: r.date, dept: r.dept, room: r.room });
         if (titles.length === 6) break;
       }
     }
@@ -428,11 +428,11 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
             {tooltip.category}
             <span className="urgent-tt-total">{tooltip.total}× in period</span>
           </div>
-          {tooltip.titles.length > 0 ? tooltip.titles.map(({ title, date, dept }, i) => (
+          {tooltip.titles.length > 0 ? tooltip.titles.map(({ title, date, dept, room }, i) => (
             <div key={i} className="urgent-tt-entry">
               <div className="urgent-tt-title">{title}</div>
               <div className="urgent-tt-meta">
-                {fmtDate(date)}{dept ? ` · ${dept}` : ''}
+                {fmtDate(date)}{room ? ` · Room ${room}` : ''}{dept ? ` · ${dept}` : ''}
               </div>
             </div>
           )) : (
