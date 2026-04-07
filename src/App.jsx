@@ -26,24 +26,38 @@ const PERIODS = [
   { key: 'ytd', label: 'YTD' },
 ];
 
-// ─── Room tooltip filtering ───────────────────────────────────────────────────
-// Excludes entries where every Notion category is a pure praise/recognition tag.
-// We rely on category names rather than title keywords — title matching is too
-// risky because words like "love", "satisfied", "pleased" appear in real complaints
-// ("Would love more outlets", "Not satisfied with room temperature").
+// ─── Room facility category filtering ────────────────────────────────────────
+// Used by the room hover tooltip to show only physical/facility issue categories.
+// Matches against Notion multi-select category names (case-insensitive substring).
 
-const PRAISE_CAT_SUBS = [
-  'recognition','compliment','praise','excellence','highlight','positive feedback',
+const ROOM_FACILITY_KEYWORDS = [
+  // Climate / HVAC
+  'hvac','air con','aircon','air-con','heating','cooling','temperature','thermostat',
+  'too hot','too cold','heat','ac unit','climate',
+  // Lighting
+  'light','lighting','lamp','bulb','dark','brightness',
+  // Connectivity / Tech
+  'wifi','wi-fi','internet','connectivity','network','tv','television','remote',
+  'cable','streaming','entertainment','screen','channel',
+  // Plumbing / Water
+  'plumb','water','shower','bath','toilet','sink','drain','faucet','leak',
+  'flood','hot water','pressure','tub',
+  // Cleanliness
+  'clean','housekeep','dirt','stain','odor','odour','smell','mold','mildew',
+  'dust','linen','towel','hygiene',
+  // Electrical / Power
+  'electric','outlet','plug','socket','power','charger',
+  // Fixtures / Furniture / Room fabric
+  'blind','curtain','window','door','lock','safe','mirror','carpet','floor',
+  'wall','ceiling','furniture','fixture','drawer','closet','wardrobe','chair',
+  'desk','bed','pillow','mattress','sofa',
+  // Amenities
+  'amenity','amenities','minibar','fridge','refrigerator','iron','hairdryer',
+  'coffee','kettle','balcony','view',
+  // General room maintenance
+  'maintenance','engineering','repair','broken','room condition','room setup',
+  'room size','facility','noise','loud','mould',
 ];
-
-// Returns false only if ALL categories on the record are praise-type.
-// Records with mixed categories (some praise + some actionable) still show.
-// Records with no categories also show — better to over-include than silently hide.
-function isRoomPhysicalIssue(r) {
-  const cats = (r.cats || []).map(c => c.toLowerCase());
-  if (cats.length === 0) return true; // no categories — keep it
-  return !cats.every(c => PRAISE_CAT_SUBS.some(k => c.includes(k)));
-}
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -325,40 +339,71 @@ function UrgentIssues({ issues, lastUpdated, periodLabel }) {
 
 // Section 2 — Room Patterns
 // Shows 6 rooms at a time; each press of "Show more" reveals 6 additional rooms.
-// Hovering a room card shows the actual issue titles logged for that room in the period.
+// Hovering a room card shows the most common facility issue categories for that room.
 const ROOMS_PER_PAGE = 6;
 
 function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
   const [visible, setVisible] = useState(ROOMS_PER_PAGE);
-  // tooltip: { room, entries: [{title, date, cats}], x, y } | null
+  // tooltip: { room, total, cats: [{cat, count}], x, y } | null
   const [tooltip, setTooltip] = useState(null);
 
-  // Reset to 6 whenever the period changes (rooms prop changes)
+  // Reset to 6 whenever the period changes
   useEffect(() => { setVisible(ROOMS_PER_PAGE); }, [rooms]);
 
   const shown     = rooms?.slice(0, visible) ?? [];
   const remaining = (rooms?.length ?? 0) - visible;
 
-  // Fetch physical room issue entries for a room in the current period, most recent first.
-  // Filters out praise/positive records and service-delivery complaints.
-  function getRoomEntries(room) {
-    if (!records?.length) return [];
+  // Tally facility-related issue categories for a room in the current period.
+  // Returns { total, cats } where cats are sorted by frequency, facility-filtered.
+  function getRoomFacilityCats(room) {
+    if (!records?.length) return { total: 0, cats: [] };
     const start = getPeriodStart(period);
-    return records
-      .filter(r => r.room === room && new Date(r.date) >= start && isRoomPhysicalIssue(r))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5);
+
+    // All records for this room in the period
+    const roomRecords = records.filter(r =>
+      r.room === room && new Date(r.date) >= start
+    );
+    if (!roomRecords.length) return { total: 0, cats: [] };
+
+    // Count every category across those records
+    const catMap = {};
+    roomRecords.forEach(r =>
+      (r.cats || []).forEach(cat => { catMap[cat] = (catMap[cat] || 0) + 1; })
+    );
+
+    // Keep only facility/room-related categories using keyword matching
+    const facilityCats = Object.entries(catMap)
+      .filter(([cat]) => {
+        const c = cat.toLowerCase();
+        return ROOM_FACILITY_KEYWORDS.some(k => c.includes(k));
+      })
+      .map(([cat, count]) => ({ cat, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    // Fallback: if no category matched our keyword list, show all categories
+    // so the tooltip is never silently empty
+    if (!facilityCats.length) {
+      const allCats = Object.entries(catMap)
+        .map(([cat, count]) => ({ cat, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6);
+      return { total: roomRecords.length, cats: allCats };
+    }
+
+    return { total: roomRecords.length, cats: facilityCats };
   }
 
   function handleMouseEnter(room, e) {
-    const entries = getRoomEntries(room);
-    if (!entries.length) return;
+    const { total, cats } = getRoomFacilityCats(room);
+    if (!total) return; // room has no records in this period — nothing to show
     const rect = e.currentTarget.getBoundingClientRect();
-    // Position to the right of the card; fall back to left if near edge
-    const ttW = 300;
+    const ttW  = 280;
     let x = rect.right + 12;
     if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
-    setTooltip({ room, entries, x, y: rect.top });
+    // Clamp vertically so tooltip doesn't run off the bottom of the viewport
+    const y = Math.min(rect.top, window.innerHeight - 260);
+    setTooltip({ room, total, cats, x, y });
   }
 
   function handleMouseLeave() {
@@ -369,7 +414,7 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
     <>
       <SectionCard
         title="Recurrent Patterns by Room"
-        subtitle={`Rooms with 2 or more issues — ${periodLabel} · Hover for details`}
+        subtitle={`Rooms with 2 or more issues — ${periodLabel} · Hover for breakdown`}
         lastUpdated={lastUpdated}
         isEmpty={!rooms?.length}
       >
@@ -411,21 +456,27 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
         )}
       </SectionCard>
 
-      {/* Tooltip rendered into document.body via portal — bypasses overflow:hidden on section-card */}
+      {/* Portal into body — escapes overflow:hidden on section-card */}
       {tooltip && createPortal(
         <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
-          <div className="room-tt-header">Room {tooltip.room} — recent issues</div>
-          {tooltip.entries.map((e, i) => (
-            <div key={i} className="room-tt-entry">
-              <div className="room-tt-title">{e.title}</div>
-              <div className="room-tt-meta">
-                {fmtDate(e.date)}
-                {e.cats?.length > 0 && (
-                  <span className="room-tt-cats"> · {e.cats.slice(0, 2).join(', ')}</span>
-                )}
+          <div className="room-tt-header">
+            Room {tooltip.room}
+            <span className="room-tt-total">{tooltip.total} issue{tooltip.total !== 1 ? 's' : ''}</span>
+          </div>
+          {tooltip.cats.length > 0 ? (() => {
+            const max = tooltip.cats[0].count;
+            return tooltip.cats.map(({ cat, count }) => (
+              <div key={cat} className="room-tt-row">
+                <span className="room-tt-label">{cat}</span>
+                <div className="room-tt-bar-wrap">
+                  <div className="room-tt-bar-fill" style={{ width: `${(count / max) * 100}%` }} />
+                </div>
+                <span className="room-tt-cnt">{count}</span>
               </div>
-            </div>
-          ))}
+            ));
+          })() : (
+            <div className="room-tt-empty">No facility categories logged</div>
+          )}
         </div>,
         document.body
       )}
