@@ -911,8 +911,8 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
       if (!hoverElRef.current) return;
       const rect = hoverElRef.current.getBoundingClientRect();
       const ttW = 290;
-      let x = rect.right + 12;
-      if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+      // Dept rows are full-width so always anchor to the right edge of the viewport
+      const x = window.innerWidth - ttW - 16;
       setTooltip(prev => prev ? { ...prev, x, y: rect.top } : null);
     }
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -958,8 +958,8 @@ function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
     hoverElRef.current = e.currentTarget;
     const rect = e.currentTarget.getBoundingClientRect();
     const ttW = 290;
-    let x = rect.right + 12;
-    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    // Dept rows are full-width — always anchor to right edge so the tooltip stays visible
+    const x = window.innerWidth - ttW - 16;
     setTooltip({ dept, cats, x, y: rect.top });
   }
 
