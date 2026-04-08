@@ -41,9 +41,15 @@ function isPositiveCat(cat) {
 }
 
 // ─── Room facility category filtering ────────────────────────────────────────
-// Used by the room hover tooltip to show only physical/facility issue categories.
-// Matches against Notion multi-select category names (case-insensitive substring).
+// Two-step filter for room pattern chips and tooltips:
+//   1. ALLOWLIST  — category must contain a physical/facility keyword
+//   2. BLOCKLIST  — category must NOT contain an operational/service keyword
+//
+// The blocklist runs second and takes priority. This catches categories like
+// "Housekeeping Service" (matches 'housekeep' allowlist but is service),
+// "Engineering Service" (matches 'engineering'), "Front Desk Service" (matches 'desk').
 
+// Step 1 — physical/facility keywords (must match at least one)
 const ROOM_FACILITY_KEYWORDS = [
   // Climate / HVAC
   'hvac','air con','aircon','air-con','heating','cooling','temperature','thermostat',
@@ -72,6 +78,49 @@ const ROOM_FACILITY_KEYWORDS = [
   'maintenance','engineering','repair','broken','room condition','room setup',
   'room size','facility','noise','loud','mould',
 ];
+
+// Step 2 — service/operational keywords (must NOT match any of these).
+// These catch categories that sneak past the allowlist because their names
+// happen to contain a facility word — e.g. "Front Desk Service" contains 'desk',
+// "Housekeeping Service" contains 'housekeep', "Engineering Service" contains 'engineering'.
+const ROOM_SERVICE_BLOCK_SUBS = [
+  'service',       // blocks: "Housekeeping Service", "Engineering Service", "Front Desk Service",
+                   //         "Valet Service", "Pool Service", "Dining Service", "Staff Service", etc.
+  'staff',         // blocks: "Staff Interaction", "Staff Friendliness", "Staffing Issues"
+  'front desk',    // blocks: "Front Desk Communication Failures"
+  'valet',         // blocks: "Valet/Parking"
+  'billing',       // blocks: "Billing Errors", "Guest Billing Issues"
+  'pricing',       // blocks: "Pricing Concerns", "Pricing/Value Concerns"
+  'check-in',      // blocks: "Check-in/Check-out Experience"
+  'check-out',
+  'communication', // blocks: "Guest Communication Failures", "Communication Issues"
+  'reservation',   // blocks: "Reservation Priority"
+  'dining',        // blocks: "Dining Service Issues", "Dining Service Delay"
+  'restaurant',    // blocks: "Restaurant Service Issues"
+  'f&b',           // blocks: "F&B Service"
+  'housekeeping',  // blocks: "Housekeeping Room Readiness" (not caught by 'service' alone)
+  'arrival area',  // blocks: "Arrival Area Issues"
+  'lobby',         // blocks: "Lobby Experience", "Lobby Comfort", "Lobby Design Issues"
+  'pre-arrival',   // blocks: "Pre-arrival Communication"
+  'pool',          // blocks: "Pool Service", "Pool Safety", "Pool Cleanliness" — pool ≠ room
+  'spa',           // blocks: "Spa Experience"
+  'wellness',      // blocks: "Wellness & Amenities", "Wellness Equipment Maintenance"
+  'bar service',   // blocks: "Bar Service"
+  'food safety',   // blocks: "Food Safety Issues"
+  'guest priority',// blocks: "Guest Priority", "Guest Priority Access"
+  'gift bag',      // blocks: "Gift Bag/Delivery Errors"
+];
+
+function isRoomServiceCat(cat) {
+  const c = cat.toLowerCase();
+  return ROOM_SERVICE_BLOCK_SUBS.some(k => c.includes(k));
+}
+
+// Combined check used when building room pattern chip lists:
+// returns true if the category should be excluded (positive praise OR operational service)
+function isNonRoomCat(cat) {
+  return isPositiveCat(cat) || isRoomServiceCat(cat);
+}
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -159,9 +208,9 @@ function computeMetrics(records, period) {
     if (!r.room) return;
     if (!roomMap[r.room]) roomMap[r.room] = { count: 0, cats: new Set(), dates: [] };
     roomMap[r.room].count++;
-    // Only store facility-related, non-positive categories on the card chips
+    // Only store physical/facility categories — strip positive praise and all service categories
     (r.cats || []).forEach(c => {
-      if (isPositiveCat(c)) return;
+      if (isNonRoomCat(c)) return;
       const cl = c.toLowerCase();
       if (ROOM_FACILITY_KEYWORDS.some(k => cl.includes(k))) roomMap[r.room].cats.add(c);
     });
@@ -197,9 +246,9 @@ function computeMetrics(records, period) {
     if (!roomTypeMap[suffix]) roomTypeMap[suffix] = { count: 0, rooms: new Set(), cats: new Set(), dates: [] };
     roomTypeMap[suffix].count++;
     roomTypeMap[suffix].rooms.add(r.room);
-    // Only store facility-related, non-positive categories on the card chips
+    // Only store physical/facility categories — strip positive praise and all service categories
     (r.cats || []).forEach(c => {
-      if (isPositiveCat(c)) return;
+      if (isNonRoomCat(c)) return;
       const cl = c.toLowerCase();
       if (ROOM_FACILITY_KEYWORDS.some(k => cl.includes(k))) roomTypeMap[suffix].cats.add(c);
     });
@@ -542,11 +591,11 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
 
     // Group records by session date — same room same day = same guest
     // Each session contributes at most 1 count per category (no double-counting)
-    const sessionCats = new Map(); // date -> Set of negative categories
+    const sessionCats = new Map(); // date -> Set of facility-only, non-service categories
     roomRecords.forEach(r => {
       if (!sessionCats.has(r.date)) sessionCats.set(r.date, new Set());
       (r.cats || [])
-        .filter(c => !isPositiveCat(c))
+        .filter(c => !isNonRoomCat(c))  // strip positive praise AND service categories
         .forEach(c => sessionCats.get(r.date).add(c));
     });
 
@@ -721,7 +770,7 @@ function RoomTypePatterns({ types, lastUpdated, periodLabel, records, period }) 
       const key = r.date + '|' + r.room;
       if (!sessionCats.has(key)) sessionCats.set(key, new Set());
       (r.cats || [])
-        .filter(c => !isPositiveCat(c))
+        .filter(c => !isNonRoomCat(c))  // strip positive praise AND service categories
         .forEach(c => sessionCats.get(key).add(c));
     });
 
