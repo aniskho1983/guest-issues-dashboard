@@ -159,7 +159,12 @@ function computeMetrics(records, period) {
     if (!r.room) return;
     if (!roomMap[r.room]) roomMap[r.room] = { count: 0, cats: new Set(), dates: [] };
     roomMap[r.room].count++;
-    (r.cats || []).forEach(c => roomMap[r.room].cats.add(c));
+    // Only store facility-related, non-positive categories on the card chips
+    (r.cats || []).forEach(c => {
+      if (isPositiveCat(c)) return;
+      const cl = c.toLowerCase();
+      if (ROOM_FACILITY_KEYWORDS.some(k => cl.includes(k))) roomMap[r.room].cats.add(c);
+    });
     roomMap[r.room].dates.push(r.date);
   });
 
@@ -192,7 +197,12 @@ function computeMetrics(records, period) {
     if (!roomTypeMap[suffix]) roomTypeMap[suffix] = { count: 0, rooms: new Set(), cats: new Set(), dates: [] };
     roomTypeMap[suffix].count++;
     roomTypeMap[suffix].rooms.add(r.room);
-    (r.cats || []).forEach(c => roomTypeMap[suffix].cats.add(c));
+    // Only store facility-related, non-positive categories on the card chips
+    (r.cats || []).forEach(c => {
+      if (isPositiveCat(c)) return;
+      const cl = c.toLowerCase();
+      if (ROOM_FACILITY_KEYWORDS.some(k => cl.includes(k))) roomTypeMap[suffix].cats.add(c);
+    });
     roomTypeMap[suffix].dates.push(r.date);
   });
 
