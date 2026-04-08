@@ -40,6 +40,31 @@ function isPositiveCat(cat) {
   return POSITIVE_CAT_SUBS.some(k => c.includes(k));
 }
 
+// ─── Positive record (title-level) filter ────────────────────────────────────
+// Some records have positive titles but are tagged with neutral/service categories
+// (e.g. "IRD dining was delicious, fast, and easy" tagged as "Dining Service").
+// Category filtering alone won't catch these. This checks the issue title for
+// unambiguous praise phrases — kept conservative to avoid blocking real complaints.
+//
+// Also checks the `sub` field (Notion's "Other Subcategory"), which has an explicit
+// "Positive recognition / no issue" option that's the most reliable signal.
+const POSITIVE_TITLE_PHRASES = [
+  'delicious','was amazing','were amazing','is amazing',
+  'was wonderful','was fantastic','was perfect','was excellent',
+  'highly recommend','exceeded expectations','went above and beyond',
+  'goes above and beyond','thoroughly enjoyed','no issues','no complaints',
+  'best experience','loved everything','loved the stay','loved our stay',
+  'fast, and easy','fast and easy',
+];
+
+function isPositiveRecord(title, sub) {
+  // Explicit Notion subcategory is the strongest signal
+  if (sub === 'Positive recognition / no issue') return true;
+  if (!title) return false;
+  const t = title.toLowerCase();
+  return POSITIVE_TITLE_PHRASES.some(p => t.includes(p));
+}
+
 // ─── Room facility category filtering ────────────────────────────────────────
 // Two-step filter for room pattern chips and tooltips:
 //   1. ALLOWLIST  — category must contain a physical/facility keyword
@@ -164,17 +189,19 @@ function computeMetrics(records, period) {
   // Ranked by a composite score: 60% frequency weight + 40% recency weight.
   //
   // Occurrence counting rules:
-  //   1. Positive/praise categories are skipped entirely.
+  //   1. Records flagged as positive (via category, title, or Notion subcategory) are skipped.
   //   2. One guest filing multiple records on the same day counts as ONE
   //      occurrence. A "session" is (date + room) when a room is present,
   //      or (date + dept) otherwise — so the valet guest on Apr 6 who
   //      generated 3 records all counts as a single valet occurrence.
   const catMap = {};
   filtered.forEach(r => {
+    // Skip the entire record if the title or Notion subcategory signals pure praise
+    if (isPositiveRecord(r.title, r.sub)) return;
     // Unique key representing one guest interaction
     const sessionKey = r.date + '|' + (r.room || r.dept || 'unknown');
     (r.cats || []).forEach(cat => {
-      if (isPositiveCat(cat)) return; // skip praise/recognition
+      if (isPositiveCat(cat)) return; // skip praise/recognition categories
       if (!catMap[cat]) catMap[cat] = { sessions: new Set(), lastDate: null, depts: new Set() };
       catMap[cat].sessions.add(sessionKey);
       if (!catMap[cat].lastDate || r.date > catMap[cat].lastDate) catMap[cat].lastDate = r.date;
@@ -447,11 +474,13 @@ function UrgentIssues({ issues, lastUpdated, periodLabel, records, period }) {
       .filter(r => new Date(r.date) >= start && (r.cats || []).includes(category))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Build one entry per session — first record encountered for that session wins
+    // Build one entry per session — first record encountered for that session wins.
+    // Skip records that are positive by title, Notion subcategory, or all-positive categories.
     const sessionMap = new Map();
     for (const r of matching) {
+      if (isPositiveRecord(r.title, r.sub)) continue;          // title/subcategory signals praise
       const negativeCats = (r.cats || []).filter(c => !isPositiveCat(c));
-      if (negativeCats.length === 0) continue; // skip pure praise records
+      if (negativeCats.length === 0) continue;                  // all categories are praise
       const key = r.date + '|' + (r.room || r.dept || 'unknown');
       if (!sessionMap.has(key)) {
         sessionMap.set(key, {

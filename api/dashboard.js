@@ -58,6 +58,9 @@ function parseRecord(page) {
     dept:  p['Department']?.select?.name ?? null,
     room:  p['Room']?.rich_text?.[0]?.plain_text?.trim() || null,
     title: p['Issue Summary']?.title?.[0]?.plain_text || '(untitled)',
+    // "Other Subcategory" has an explicit "Positive recognition / no issue" option —
+    // the most reliable signal that a record is praise, not a complaint.
+    sub:   p['Other Subcategory']?.select?.name ?? null,
   };
 }
 
