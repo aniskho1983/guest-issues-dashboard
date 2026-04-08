@@ -419,6 +419,8 @@ body {
 .room-tt-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-light)); border-radius: 3px; }
 .room-tt-cnt { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-align: right; }
 .room-tt-empty { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+/* Room list line shown in the floor-plan type tooltip */
+.room-tt-rooms { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.4; }
 
 .room-header {
   display: flex;

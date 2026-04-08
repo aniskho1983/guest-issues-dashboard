@@ -173,6 +173,40 @@ function computeMetrics(records, period) {
     }))
     .sort((a, b) => b.count - a.count);
 
+  // ── Room Type Patterns ────────────────────────────────────────────────────
+  // Groups rooms by their last-2-digit suffix, which represents the floor-plan
+  // position (e.g. 205, 305, 405, 505 all share the "05" layout).
+  //
+  // This surfaces systematic design issues — like the "05" bathroom size and
+  // door swing — that would otherwise be invisible because each individual room
+  // only generates 1 complaint per period and never hits the 2× threshold alone.
+  //
+  // Rule: a type must span 2+ distinct room numbers to qualify as a pattern
+  // (otherwise it's just a single room that got counted twice).
+  const roomTypeMap = {};
+  filtered.forEach(r => {
+    if (!r.room) return;
+    const digits = String(r.room).replace(/\D/g, ''); // strip non-digits
+    if (digits.length < 2) return;                     // skip malformed numbers
+    const suffix = digits.slice(-2);                   // last 2 digits = floor-plan key
+    if (!roomTypeMap[suffix]) roomTypeMap[suffix] = { count: 0, rooms: new Set(), cats: new Set(), dates: [] };
+    roomTypeMap[suffix].count++;
+    roomTypeMap[suffix].rooms.add(r.room);
+    (r.cats || []).forEach(c => roomTypeMap[suffix].cats.add(c));
+    roomTypeMap[suffix].dates.push(r.date);
+  });
+
+  const roomTypePatterns = Object.entries(roomTypeMap)
+    .filter(([, v]) => v.rooms.size >= 2) // must span at least 2 different room numbers
+    .map(([suffix, v]) => ({
+      suffix,
+      count:      v.count,
+      rooms:      [...v.rooms].sort(),
+      issueTypes: [...v.cats],
+      lastDate:   [...v.dates].sort().pop(),
+    }))
+    .sort((a, b) => b.count - a.count);
+
   // ── Department Patterns ───────────────────────────────────────────────────
   const deptMap = {};
   filtered.forEach(r => {
@@ -187,7 +221,7 @@ function computeMetrics(records, period) {
   // ── Venue (F&B) Patterns ──────────────────────────────────────────────────
   const venuePatterns = deptPatterns.filter(d => FNB_DEPTS.has(d.dept));
 
-  return { urgentIssues, roomPatterns, deptPatterns, venuePatterns, count: filtered.length };
+  return { urgentIssues, roomPatterns, roomTypePatterns, deptPatterns, venuePatterns, count: filtered.length };
 }
 
 // YTD summary is always year-to-date regardless of the period toggle
@@ -626,6 +660,184 @@ function RoomPatterns({ rooms, lastUpdated, periodLabel, records, period }) {
   );
 }
 
+// Section 2b — Room Type Patterns
+// Shows complaints aggregated by floor-plan suffix (last 2 digits of room number).
+// This reveals systematic layout/design issues that span multiple rooms on the same
+// floor plan — like "05" rooms where every floor complains about the same bathroom.
+function RoomTypePatterns({ types, lastUpdated, periodLabel, records, period }) {
+  const [visible, setVisible] = useState(ROOMS_PER_PAGE);
+  const [tooltip, setTooltip] = useState(null);
+  const hoverElRef = useRef(null);
+
+  // Reset to first page when period changes
+  useEffect(() => { setVisible(ROOMS_PER_PAGE); }, [types]);
+
+  // Keep tooltip aligned as the page scrolls
+  useEffect(() => {
+    function onScroll() {
+      if (!hoverElRef.current) return;
+      const rect = hoverElRef.current.getBoundingClientRect();
+      const ttW = 300;
+      let x = rect.right + 12;
+      if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+      const y = Math.min(rect.top, window.innerHeight - 300);
+      setTooltip(prev => prev ? { ...prev, x, y } : null);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const shown     = types?.slice(0, visible) ?? [];
+  const remaining = (types?.length ?? 0) - visible;
+
+  // Computes pooled facility categories for all rooms sharing a given suffix.
+  // Uses the same session-dedup logic as the individual room tooltip:
+  // date + room = one session, so one guest complaining twice still counts once.
+  function getRoomTypeFacilityCats(suffix) {
+    if (!records?.length) return { total: 0, cats: [] };
+    const start = getPeriodStart(period);
+
+    // Collect all records for any room ending in this suffix
+    const typeRecords = records.filter(r => {
+      if (!r.room || new Date(r.date) < start) return false;
+      const digits = String(r.room).replace(/\D/g, '');
+      return digits.length >= 2 && digits.slice(-2) === suffix;
+    });
+    if (!typeRecords.length) return { total: 0, cats: [] };
+
+    // One session per date+room pair — same guest can't inflate the count
+    const sessionCats = new Map();
+    typeRecords.forEach(r => {
+      const key = r.date + '|' + r.room;
+      if (!sessionCats.has(key)) sessionCats.set(key, new Set());
+      (r.cats || [])
+        .filter(c => !isPositiveCat(c))
+        .forEach(c => sessionCats.get(key).add(c));
+    });
+
+    // Tally how many sessions included each category
+    const catMap = {};
+    for (const cats of sessionCats.values()) {
+      cats.forEach(cat => { catMap[cat] = (catMap[cat] || 0) + 1; });
+    }
+
+    // Prefer facility-relevant categories; fall back to all negatives
+    const facilityCats = Object.entries(catMap)
+      .filter(([cat]) => {
+        const c = cat.toLowerCase();
+        return ROOM_FACILITY_KEYWORDS.some(k => c.includes(k));
+      })
+      .map(([cat, count]) => ({ cat, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    if (!facilityCats.length) {
+      const allCats = Object.entries(catMap)
+        .map(([cat, count]) => ({ cat, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6);
+      return { total: sessionCats.size, cats: allCats };
+    }
+
+    return { total: sessionCats.size, cats: facilityCats };
+  }
+
+  function handleMouseEnter(type, e) {
+    const { total, cats } = getRoomTypeFacilityCats(type.suffix);
+    if (!total) return;
+    hoverElRef.current = e.currentTarget;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ttW  = 300;
+    let x = rect.right + 12;
+    if (x + ttW > window.innerWidth - 12) x = rect.left - ttW - 12;
+    const y = Math.min(rect.top, window.innerHeight - 300);
+    setTooltip({ suffix: type.suffix, rooms: type.rooms, total, cats, x, y });
+  }
+
+  function handleMouseLeave() {
+    hoverElRef.current = null;
+    setTooltip(null);
+  }
+
+  return (
+    <>
+      <SectionCard
+        title="Recurrent Patterns by Room Type"
+        subtitle={`Floor-plan groups with issues across 2+ rooms — ${periodLabel} · Hover for breakdown`}
+        lastUpdated={lastUpdated}
+        isEmpty={!types?.length}
+      >
+        <div className="room-grid">
+          {shown.map(t => (
+            <div
+              key={t.suffix}
+              className="room-card room-card-hoverable"
+              onMouseEnter={e => handleMouseEnter(t, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <div className="room-header">
+                {/* e.g. "x05 Rooms" — the 'x' signals "any floor" */}
+                <span className="room-number">x{t.suffix} Rooms</span>
+                <span className="room-count">{t.count}×</span>
+              </div>
+              {/* Show which specific rooms contributed */}
+              <div className="room-last">{t.rooms.join(', ')}</div>
+              <div className="room-cats">
+                {t.issueTypes.slice(0, 3).map(c => (
+                  <span key={c} className="cat-chip">{c}</span>
+                ))}
+                {t.issueTypes.length > 3 && (
+                  <span className="cat-chip cat-chip-more">+{t.issueTypes.length - 3}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {remaining > 0 && (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              className="show-more-btn"
+              onClick={() => setVisible(v => v + ROOMS_PER_PAGE)}
+            >
+              Show {Math.min(remaining, ROOMS_PER_PAGE)} more ▼
+            </button>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Portal into body — escapes overflow:hidden on section-card */}
+      {tooltip && createPortal(
+        <div className="room-tooltip" style={{ left: tooltip.x, top: tooltip.y, width: 300 }}>
+          <div className="room-tt-header">
+            x{tooltip.suffix} Floor Plan
+            <span className="room-tt-total">{tooltip.total} issue{tooltip.total !== 1 ? 's' : ''}</span>
+          </div>
+          {/* List the individual rooms that make up this pattern */}
+          <div className="room-tt-rooms">
+            Rooms: {tooltip.rooms.join(', ')}
+          </div>
+          {tooltip.cats.length > 0 ? (() => {
+            const max = tooltip.cats[0].count;
+            return tooltip.cats.map(({ cat, count }) => (
+              <div key={cat} className="room-tt-row">
+                <span className="room-tt-label">{cat}</span>
+                <div className="room-tt-bar-wrap">
+                  <div className="room-tt-bar-fill" style={{ width: `${(count / max) * 100}%` }} />
+                </div>
+                <span className="room-tt-cnt">{count}</span>
+              </div>
+            ));
+          })() : (
+            <div className="room-tt-empty">No facility categories logged</div>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Section 3 — Department Patterns
 // Accepts `records` + `period` so it can compute per-dept category breakdowns on hover.
 function DeptPatterns({ depts, lastUpdated, periodLabel, records, period }) {
@@ -957,6 +1169,16 @@ export default function App() {
                 periodLabel={periodLabel}
               />
             </div>
+
+            {/* Full-width row for floor-plan patterns — surfaces layout issues
+                that are spread across multiple rooms and would otherwise be invisible */}
+            <RoomTypePatterns
+              types={metrics.roomTypePatterns}
+              lastUpdated={data.lastUpdated}
+              periodLabel={periodLabel}
+              records={data.records}
+              period={period}
+            />
 
             <DeptPatterns
               depts={metrics.deptPatterns}
